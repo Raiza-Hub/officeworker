@@ -5,12 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
+  Activity,
   ChevronDown,
-  CircleDot,
   CircleHelp,
   CreditCard,
-  GitPullRequest,
-  Inbox,
+  Files,
   MousePointer2,
   PanelLeftClose,
   PanelLeftOpen,
@@ -26,10 +25,9 @@ type SidebarItem = {
 };
 
 const mainItems: SidebarItem[] = [
-  { label: "Inbox", icon: Inbox, href: "/inbox" },
-  { label: "Reviews", icon: GitPullRequest, unread: true },
-  { label: "My issues", icon: CircleDot, href: "/issues" },
   { label: "Agent", icon: MousePointer2, href: "/agent" },
+  { label: "Documents", icon: Files, href: "/inbox" },
+  { label: "Activity", icon: Activity, href: "/issues" },
 ];
 
 const workspaceItems: SidebarItem[] = [
