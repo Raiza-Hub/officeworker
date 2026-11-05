@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 
 export default function LoginPage() {
   return (
@@ -28,12 +29,7 @@ export default function LoginPage() {
         </p>
 
         <div className="mt-7">
-          <button
-            type="button"
-            className="mx-auto inline-flex h-[44px] w-[288px] max-w-full items-center justify-center rounded-full bg-[#6069d9] px-4 text-[13px] leading-normal font-medium text-white transition-[background-color,transform] duration-150 hover:bg-[#535dcd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6069d9] focus-visible:ring-offset-2 active:scale-[0.99] motion-reduce:transition-none"
-          >
-            Continue with Google
-          </button>
+          <GoogleSignInButton />
         </div>
 
         <p className="mx-auto mt-12 h-[58.5px] w-[288px] max-w-full text-[13px] leading-[19.5px] font-[450] tracking-normal text-[#777981]">
