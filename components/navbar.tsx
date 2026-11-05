@@ -51,9 +51,9 @@ export function Navbar() {
     pathname === "/login" ||
     pathname === "/create-workspace" ||
     pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/inbox") ||
+    pathname.startsWith("/documents") ||
     pathname.startsWith("/agent") ||
-    pathname.startsWith("/issues") ||
+    pathname.startsWith("/activity") ||
     pathname.startsWith("/profile") ||
     pathname.startsWith("/billing")
   ) {

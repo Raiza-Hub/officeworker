@@ -17,9 +17,9 @@ const examples: Example[] = [
   },
   {
     title: "Research a topic",
-    descriptionLines: ["Research a topic across", "the issue backlog"],
+    descriptionLines: ["Research a topic across", "the activity backlog"],
     icon: Search,
-    prompt: "Research a topic across the issue backlog.",
+    prompt: "Research a topic across the activity backlog.",
   },
   {
     title: "Set up new team",

@@ -3,7 +3,7 @@ import { Search, SlidersHorizontal } from "lucide-react";
 const toolbarButtonClassName =
   "inline-flex size-7 items-center justify-center rounded-full border border-[#e7e7ea] bg-white text-[#73767e] shadow-[0_0.5px_1px_rgba(0,0,0,0.04)] transition-colors hover:bg-[#f7f7f8] hover:text-[#34363c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6069d9]/40";
 
-export function IssueLabelsToolbar() {
+export function ActivityToolbar() {
   return (
     <div className="flex h-11 shrink-0 items-center justify-between px-[18px]">
       <form role="search" className="relative flex h-7 w-[300px] items-center">

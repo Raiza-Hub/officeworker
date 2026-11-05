@@ -7,7 +7,7 @@ const PLANS = [
     features: [
       "All Free features +",
       "5 teams",
-      "Unlimited issues",
+      "Unlimited activities",
       "Unlimited file uploads",
       "Admin roles",
       "Loops",

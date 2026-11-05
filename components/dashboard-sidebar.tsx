@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useConvexAuth, useQuery } from "convex/react";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -11,11 +11,11 @@ import {
   CreditCard,
   Files,
   MousePointer2,
-  PanelLeftClose,
-  PanelLeftOpen,
   Search,
   UserRound,
 } from "lucide-react";
+import { api } from "@/convex/_generated/api";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 
 type SidebarItem = {
   label: string;
@@ -26,8 +26,8 @@ type SidebarItem = {
 
 const mainItems: SidebarItem[] = [
   { label: "Agent", icon: MousePointer2, href: "/agent" },
-  { label: "Documents", icon: Files, href: "/inbox" },
-  { label: "Activity", icon: Activity, href: "/issues" },
+  { label: "Documents", icon: Files, href: "/documents" },
+  { label: "Activity", icon: Activity, href: "/activity" },
 ];
 
 const workspaceItems: SidebarItem[] = [
@@ -39,6 +39,13 @@ const iconClassName = "size-3.5 shrink-0";
 const iconStrokeWidth = 2.25;
 const focusRingClassName =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6069d9]/40";
+
+function getInitials(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "U";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
+}
 
 function SidebarItemButton({
   item,
@@ -100,13 +107,20 @@ function SidebarItemButton({
 }
 
 export function DashboardSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  const collapsed = false;
   const pathname = usePathname();
+  const { isAuthenticated } = useConvexAuth();
+  const currentUser = useQuery(
+    api.users.current,
+    isAuthenticated ? {} : "skip",
+  );
+  const displayName = currentUser?.name?.trim() || currentUser?.email || "Workspace";
+  const initials = getInitials(displayName);
 
   return (
     <aside
       aria-label="Dashboard sidebar"
-      className={`box-border flex h-svh shrink-0 flex-col overflow-y-auto bg-sidebar-bg pt-2 pb-3 text-sidebar-text transition-[width] duration-[140ms] ease-in-out motion-reduce:transition-none ${
+      className={`box-border flex h-full shrink-0 flex-col overflow-y-auto overscroll-contain bg-sidebar-bg pt-2 pb-3 text-sidebar-text transition-[width] duration-[140ms] ease-in-out motion-reduce:transition-none ${
         collapsed ? "w-16 px-2" : "w-[244px] px-3"
       }`}
     >
@@ -120,7 +134,7 @@ export function DashboardSidebar() {
         <button
           type="button"
           aria-label="Open workspace menu"
-          title={collapsed ? "wisdom Adebola" : undefined}
+          title={collapsed ? displayName : undefined}
           className={`flex h-7 min-w-0 items-center rounded-[10px] text-left text-sidebar-text transition-colors duration-100 ease-out hover:bg-[#f3f3f4] ${focusRingClassName} motion-reduce:transition-none ${
             collapsed
               ? "w-7 justify-center px-0"
@@ -128,12 +142,12 @@ export function DashboardSidebar() {
           }`}
         >
           <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-sidebar-avatar text-[10px] leading-none font-semibold tracking-[-0.02em] text-white">
-            WA
+            {initials}
           </span>
           {!collapsed && (
             <>
               <span className="truncate text-[13px] leading-[23px] font-[550]">
-                wisdom Adebola
+                {displayName}
               </span>
               <ChevronDown
                 aria-hidden="true"
@@ -222,28 +236,7 @@ export function DashboardSidebar() {
             strokeWidth={iconStrokeWidth}
           />
         </button>
-        <button
-          type="button"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-pressed={collapsed}
-          onClick={() => setCollapsed((value) => !value)}
-          className={`inline-flex size-7 items-center justify-center rounded-full text-[#4f525a] transition-colors duration-100 ease-out hover:bg-[#f3f3f4] hover:text-sidebar-foreground ${focusRingClassName} motion-reduce:transition-none`}
-        >
-          {collapsed ? (
-            <PanelLeftOpen
-              aria-hidden="true"
-              className={iconClassName}
-              strokeWidth={iconStrokeWidth}
-            />
-          ) : (
-            <PanelLeftClose
-              aria-hidden="true"
-              className={iconClassName}
-              strokeWidth={iconStrokeWidth}
-            />
-          )}
-        </button>
+        <SignOutButton collapsed={collapsed} />
       </div>
     </aside>
   );

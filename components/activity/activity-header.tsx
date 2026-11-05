@@ -1,6 +1,6 @@
 import { Bell, Plus } from "lucide-react";
 
-export function IssuesHeader() {
+export function ActivityHeader() {
   return (
     <header className="flex h-11 shrink-0 items-center justify-between border-b border-[#e9e9ec] px-[18px]">
       <h1 className="text-[13px] leading-4 font-semibold tracking-[-0.01em] text-[#27282d]">
@@ -9,7 +9,7 @@ export function IssuesHeader() {
       <div className="flex shrink-0 items-center gap-1">
         <button
           type="button"
-          aria-label="Setup active issues notifications"
+          aria-label="Setup activity notifications"
           className="inline-flex size-7 items-center justify-center rounded-md text-[#646770] transition-colors hover:bg-[#f0f0f2] hover:text-[#303137] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6069d9]/40"
         >
           <Bell aria-hidden="true" className="size-3.5" strokeWidth={1.9} />

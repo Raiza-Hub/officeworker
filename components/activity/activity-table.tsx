@@ -1,7 +1,8 @@
 import { ArrowDown } from "lucide-react";
-import { IssueLabelRow, type IssueLabel } from "@/components/issues/issue-label-row";
+import { ActivityRow, type Activity } from "@/components/activity/activity-row";
+import { activityTableColumns } from "@/components/activity/activity-table-layout";
 
-const labels: IssueLabel[] = [
+const labels: Activity[] = [
   { name: "Bug", created: "Oct 29" },
   {
     name: "Feature",
@@ -12,9 +13,6 @@ const labels: IssueLabel[] = [
     created: "Oct 29",
   },
 ];
-
-const tableColumns =
-  "grid-cols-[60px_minmax(0,1fr)_75px_102px_82px_28px_32px]";
 
 function SortableHeader({ children, sorted = false }: { children: string; sorted?: boolean }) {
   return (
@@ -34,9 +32,9 @@ function SortableHeader({ children, sorted = false }: { children: string; sorted
   );
 }
 
-function IssueLabelsTableHeader() {
+function ActivityTableHeader() {
   return (
-    <div role="row" className={`grid h-8 items-center ${tableColumns} text-[#5b5d65]`}>
+    <div role="row" className={`grid h-8 items-center ${activityTableColumns} text-[#5b5d65]`}>
       <span aria-hidden="true" />
       <div className="flex items-center pl-0">
         <SortableHeader sorted>Name</SortableHeader>
@@ -56,13 +54,13 @@ function IssueLabelsTableHeader() {
   );
 }
 
-export function IssueLabelsTable() {
+export function ActivityTable() {
   return (
-    <div role="table" aria-label="Issue labels" className="min-w-[900px] text-[#24252a]">
-      <IssueLabelsTableHeader />
+    <div role="table" aria-label="Activity labels" className="min-w-[900px] text-[#24252a]">
+      <ActivityTableHeader />
       <div role="rowgroup">
         {labels.map((label) => (
-          <IssueLabelRow key={label.name} label={label} />
+          <ActivityRow key={label.name} label={label} />
         ))}
       </div>
     </div>
