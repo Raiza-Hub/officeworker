@@ -5,7 +5,7 @@ import { WorkspaceAccessSection } from "@/components/profile/workspace-access-se
 
 export function ProfilePage() {
   return (
-    <div className="h-full overflow-y-auto px-6 pb-12 pt-16">
+    <div className="h-full overflow-y-auto overscroll-contain px-6 pb-12 pt-16">
       <div className="mx-auto w-full max-w-[640px]">
         <ProfileHeading />
         <div className="mt-8">
