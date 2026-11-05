@@ -1,7 +1,8 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { isAuthenticatedNextjs } from "@convex-dev/auth/nextjs/server";
 import { z } from "zod";
+import { createR2Client, getR2Config } from "../r2";
 
 const UPLOAD_TTL_SECONDS = 900;
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
@@ -12,22 +13,6 @@ const uploadUrlRequestSchema = z.object({
   fileType: z.string().trim().min(1).max(255),
   fileSize: z.number().int().positive().max(MAX_FILE_SIZE_BYTES),
 });
-
-type R2Config = {
-  accountId: string;
-  bucket: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-};
-
-function getR2Config(): R2Config | undefined {
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const bucket = process.env.R2_BUCKET;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-  if (!accountId || !bucket || !accessKeyId || !secretAccessKey) return undefined;
-  return { accountId, bucket, accessKeyId, secretAccessKey };
-}
 
 function presignKey(fileName: string): string {
   const sanitized = fileName
@@ -71,14 +56,7 @@ export async function POST(request: Request) {
 
   const key = `documents/${crypto.randomUUID()}-${presignKey(parsed.fileName)}`;
   try {
-    const s3 = new S3Client({
-      region: "auto",
-      endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      },
-    });
+    const s3 = createR2Client(config);
     const url = await getSignedUrl(
       s3,
       new PutObjectCommand({

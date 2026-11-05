@@ -15,17 +15,14 @@
     "@aws-sdk/s3-request-presigner": "^3.1161.0",
     "@convex-dev/auth": "^0.0.96",
     "@hookform/resolvers": "^6.0.2",
-    "clsx": "^2.1.1",
     "convex": "^1.48.0",
     "lucide-react": "^1.65.0",
-    "mini-svg-data-uri": "^1.4.4",
     "motion": "^14.7.1",
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-hook-form": "^7.91.0",
     "sonner": "^2.0.8",
-    "tailwind-merge": "^3.7.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

@@ -11,7 +11,7 @@ function WorkspaceAccessCard() {
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
   const currentUser = useQuery(api.users.current);
-  const displayName = currentUser?.name?.trim() || currentUser?.email || "wisdom Adebola";
+  const displayName = currentUser?.name?.trim() || currentUser?.email || "";
 
   async function handleSignOut() {
     setIsPending(true);
@@ -34,10 +34,14 @@ function WorkspaceAccessCard() {
             <span aria-hidden="true" className="mr-1 size-1.5 rounded-full bg-[#3fbd54]" />
             <span>Connected</span>
           </span>
-          <span aria-hidden="true" className="mx-1.5 text-[#777a82]">
-            ·
-          </span>
-          <span className="truncate text-[#777a82]">{displayName}</span>
+          {displayName ? (
+            <>
+              <span aria-hidden="true" className="mx-1.5 text-[#777a82]">
+                ·
+              </span>
+              <span className="truncate text-[#777a82]">{displayName}</span>
+            </>
+          ) : null}
         </div>
       </div>
 

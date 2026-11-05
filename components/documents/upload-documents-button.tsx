@@ -90,11 +90,38 @@ export function UploadDocumentsButton({
             : `R2 upload failed (${uploadResponse.status})`,
         );
       }
-      await setDocumentSuccess({ id: documentId });
     } catch (error) {
+      // The upload may have written the object before the client saw the
+      // failure, so ask the server to remove it before dropping the record.
+      await fetch("/api/documents/object", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: presign.key }),
+      }).catch(() => undefined);
       await deleteDocument({ id: documentId }).catch(() => undefined);
       throw error;
     }
+
+    await confirmDocumentSuccess(documentId, file.name);
+  }
+
+  async function confirmDocumentSuccess(documentId: Id<"documents">, fileName: string) {
+    const retryDelaysMs = [500, 1000, 2000];
+    for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+      if (attempt > 0) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelaysMs[attempt - 1]));
+      }
+      try {
+        await setDocumentSuccess({ id: documentId });
+        return;
+      } catch {}
+    }
+    // The R2 object is stored and its record still exists, so the record is
+    // kept (status stays "Uploading") instead of being deleted, which would
+    // orphan the object in R2. Retrying or deleting the row can reconcile it.
+    throw new Error(
+      `"${fileName}" uploaded, but the confirmation update failed. The document stays listed as "Uploading" until it syncs.`,
+    );
   }
 
   return (

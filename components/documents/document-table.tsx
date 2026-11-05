@@ -2,13 +2,11 @@
 
 import { MoreHorizontal } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { useConvexAuth, usePaginatedQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useStableDocumentSearch, DOCUMENTS_PAGE_SIZE } from "@/components/documents/use-stable-paginated-query";
 import { DocumentEmptyState } from "@/components/documents/document-empty-state";
 import { DocumentTableHeader } from "@/components/documents/document-table-header";
 
 const tableColumns = "grid-cols-[minmax(0,1fr)_120px_92px_82px_82px_28px]";
-const PAGE_SIZE = 50;
 const SIZE_UNITS = ["B", "KB", "MB", "GB", "TB"];
 const dateFormatter = new Intl.DateTimeFormat("en-US", { day: "numeric", month: "short" });
 
@@ -30,12 +28,7 @@ function getFileTypeLabel(name: string): string {
 }
 
 export function DocumentTable({ searchTerm }: { searchTerm: string }) {
-  const { isAuthenticated } = useConvexAuth();
-  const { results, status, loadMore } = usePaginatedQuery(
-    api.documents.searchList,
-    isAuthenticated ? { searchTerm } : "skip",
-    { initialNumItems: PAGE_SIZE },
-  );
+  const { results, status, loadMore, searchTerm: shownTerm } = useStableDocumentSearch(searchTerm);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,7 +37,7 @@ export function DocumentTable({ searchTerm }: { searchTerm: string }) {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
-          loadMore(PAGE_SIZE);
+          loadMore(DOCUMENTS_PAGE_SIZE);
         }
       },
       { rootMargin: "80px" },
@@ -59,13 +52,6 @@ export function DocumentTable({ searchTerm }: { searchTerm: string }) {
 
       {status !== "LoadingFirstPage" ? (
         <>
-          <div className="mx-2 flex h-8 items-center rounded-[9px] bg-[#e5e5e7] px-[52px] text-[12px] leading-4 font-medium text-[#656870]">
-            <div className="flex h-full items-center gap-2">
-              <span>Documents</span>
-              <span className="font-medium text-[#a0a2a8]">{results.length}</span>
-            </div>
-          </div>
-
           {results.map((doc) => {
             const isUploading = doc.status === "Uploading";
             return (
@@ -101,9 +87,9 @@ export function DocumentTable({ searchTerm }: { searchTerm: string }) {
           })}
 
           {results.length === 0 ? (
-            searchTerm.trim().length > 0 ? (
+            shownTerm.trim().length > 0 ? (
               <div className="mx-2 mt-3 rounded-[9px] border border-dashed border-[#dedee3] px-[52px] py-6 text-[12px] font-medium text-[#656870]">
-                No documents match &quot;{searchTerm.trim()}&quot;
+                No documents match &quot;{shownTerm.trim()}&quot;
               </div>
             ) : (
               <DocumentEmptyState />
