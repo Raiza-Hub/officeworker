@@ -1,11 +1,11 @@
 "use client";
 
-import { Archive, Group, Pencil, Trash2 } from "lucide-react";
-
-type ActivityRowAction = "edit" | "convert" | "archive" | "delete";
+import { Pencil, Trash2 } from "lucide-react";
 
 type ActivityRowActionsMenuProps = {
-  onAction: (action: ActivityRowAction) => void;
+  onRename: () => void;
+  onDelete: () => void;
+  onClose: () => void;
 };
 
 const menuItemClassName =
@@ -15,12 +15,16 @@ const menuItemHoverBackgroundClassName =
   "pointer-events-none absolute inset-y-0 right-[6px] left-[6px] -z-10 rounded-[8px] bg-transparent transition-colors group-hover/action:bg-[lch(94.6%_0_282)] group-focus-within/action:bg-[lch(94.6%_0_282)]";
 
 export function ActivityRowActionsMenu({
-  onAction,
+  onRename,
+  onDelete,
+  onClose,
 }: ActivityRowActionsMenuProps) {
   return (
     <div
       role="menu"
-      aria-label="Label actions"
+      aria-label="Chat actions"
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
       className="absolute top-full right-[18px] z-30 mt-[-1px] w-[195px] rounded-[12px] border-[0.5px] border-[lch(91.9%_0_282)] bg-[lch(100%_0_282)] p-0"
       style={{
         boxShadow:
@@ -33,45 +37,24 @@ export function ActivityRowActionsMenu({
         type="button"
         role="menuitem"
         className={menuItemClassName}
-        onClick={() => onAction("edit")}
+        onClick={() => {
+          onClose();
+          onRename();
+        }}
       >
         <span aria-hidden="true" className={menuItemHoverBackgroundClassName} />
         <Pencil aria-hidden="true" className="size-4 shrink-0 text-[lch(20_1_282)]" strokeWidth={2} />
-        <span>Edit label name</span>
-        <kbd className="ml-auto text-[11px] leading-[1.1] font-medium text-[lch(40_1_282)]">E</kbd>
+        <span>Rename</span>
       </button>
 
       <button
         type="button"
         role="menuitem"
         className={menuItemClassName}
-        onClick={() => onAction("convert")}
-      >
-        <span aria-hidden="true" className={menuItemHoverBackgroundClassName} />
-        <Group aria-hidden="true" className="size-4 shrink-0 text-[lch(20_1_282)]" strokeWidth={2} />
-        <span>Convert to label group</span>
-      </button>
-
-      <div aria-hidden="true" className="h-3 w-full py-[6px]">
-        <div className="h-[0.5px] w-full bg-[lch(91.9%_0_282)]" />
-      </div>
-
-      <button
-        type="button"
-        role="menuitem"
-        className={menuItemClassName}
-        onClick={() => onAction("archive")}
-      >
-        <span aria-hidden="true" className={menuItemHoverBackgroundClassName} />
-        <Archive aria-hidden="true" className="size-4 shrink-0 text-[lch(20_1_282)]" strokeWidth={2} />
-        <span>Archive…</span>
-      </button>
-
-      <button
-        type="button"
-        role="menuitem"
-        className={menuItemClassName}
-        onClick={() => onAction("delete")}
+        onClick={() => {
+          onClose();
+          onDelete();
+        }}
       >
         <span aria-hidden="true" className={menuItemHoverBackgroundClassName} />
         <Trash2 aria-hidden="true" className="size-4 shrink-0 text-[lch(20_1_282)]" strokeWidth={2} />

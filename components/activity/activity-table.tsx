@@ -1,18 +1,10 @@
-import { ArrowDown } from "lucide-react";
-import { ActivityRow, type Activity } from "@/components/activity/activity-row";
-import { activityTableColumns } from "@/components/activity/activity-table-layout";
+"use client";
 
-const labels: Activity[] = [
-  { name: "Bug", created: "Oct 29" },
-  {
-    name: "Feature",
-    created: "Oct 29",
-  },
-  {
-    name: "Improvement",
-    created: "Oct 29",
-  },
-];
+import { ArrowDown } from "lucide-react";
+import { useQuery } from "convex-helpers/react/cache/hooks";
+import { api } from "@/convex/_generated/api";
+import { ActivityRow, ActivityRowSkeleton, type Activity } from "@/components/activity/activity-row";
+import { activityTableColumns } from "@/components/activity/activity-table-layout";
 
 function SortableHeader({ children, sorted = false }: { children: string; sorted?: boolean }) {
   return (
@@ -54,14 +46,46 @@ function ActivityTableHeader() {
   );
 }
 
+function formatDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export function ActivityTable() {
+  const threads = useQuery(api.chat.listThreads, {
+    paginationOpts: { cursor: null, numItems: 30 },
+  });
+
+  const isLoading = threads === undefined;
+
+  const rows: Activity[] = (threads?.page ?? []).map((thread) => ({
+    threadId: thread.threadId,
+    name: thread.title?.trim() || "New chat",
+    created: formatDate(thread.lastActivityAt),
+  }));
+
   return (
-    <div role="table" aria-label="Activity labels" className="min-w-[900px] text-[#24252a]">
+    <div role="table" aria-label="Chat activity" className="min-w-[900px] text-[#24252a]">
       <ActivityTableHeader />
       <div role="rowgroup">
-        {labels.map((label) => (
-          <ActivityRow key={label.name} label={label} />
-        ))}
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, index) => (
+            <ActivityRowSkeleton key={index} index={index} />
+          ))
+        ) : (
+          <>
+            {rows.map((row) => (
+              <ActivityRow key={row.threadId} label={row} />
+            ))}
+            {rows.length === 0 && (
+              <div className="px-[2.5px] py-6 text-[13px] leading-[20px] text-[#85878e]">
+                No chats yet. Start one from the Agent page.
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

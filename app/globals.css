@@ -21,3 +21,66 @@ body {
   color: #171717;
   font-family: var(--font-sans);
 }
+
+.shimmer-text {
+  background: linear-gradient(
+    110deg,
+    #85878e 35%,
+    #24252a 50%,
+    #85878e 65%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer-slide 1.6s linear infinite;
+}
+
+@keyframes shimmer-slide {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text {
+    animation: none;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #attachment-preview-root,
+  #attachment-preview-root * {
+    visibility: visible !important;
+  }
+
+  #attachment-preview-root {
+    position: absolute !important;
+    inset: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  #attachment-preview-toolbar {
+    display: none !important;
+  }
+
+  #attachment-preview-pages {
+    position: static !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  #attachment-preview-pages .react-pdf__Page {
+    break-after: page;
+    border: 0 !important;
+  }
+}
