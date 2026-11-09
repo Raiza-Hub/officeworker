@@ -1,17 +1,19 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { useAction } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { z } from "zod";
+
+const DEFAULT_PORTAL_URL = "https://diper.ogunstate.gov.ng";
 
 const workspaceSchema = z.object({
   portalUrl: z.union([z.literal(""), z.string().url("Enter a valid portal URL")]),
-  name: z
-    .string()
-    .trim()
-    .min(1, "Enter a workspace name")
-    .max(100, "Workspace names must be 100 characters or fewer"),
+  email: z.string().trim().min(1, "Enter your email").email("Enter a valid email address"),
   password: z.string().min(1, "Enter your password"),
 });
 
@@ -54,7 +56,9 @@ function EyeIcon({ visible }: { visible: boolean }) {
 
 export function WorkspaceForm() {
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const router = useRouter();
+  const upsertConnection = useAction(api.workspaceActions.upsertConnection);
   const {
     register,
     handleSubmit,
@@ -62,14 +66,30 @@ export function WorkspaceForm() {
   } = useForm<WorkspaceFields>({
     resolver: zodResolver(workspaceSchema),
     defaultValues: {
-      portalUrl: "",
-      name: "",
+      portalUrl: DEFAULT_PORTAL_URL,
+      email: "",
       password: "",
     },
   });
 
-  const onSubmit = handleSubmit(() => {
-    setSubmitted(true);
+  const onSubmit = handleSubmit(async (values) => {
+    setServerError(null);
+    try {
+      await upsertConnection({
+        portalKey: "diper",
+        portalUrl: values.portalUrl || DEFAULT_PORTAL_URL,
+        portalEmail: values.email,
+        password: values.password,
+      });
+      toast.success("Workspace connected", {
+        description: "Your portal account is linked to this workspace.",
+      });
+      router.replace("/dashboard");
+    } catch (error) {
+      setServerError(
+        error instanceof Error ? error.message : "Could not link the portal account. Try again.",
+      );
+    }
   });
 
   return (
@@ -107,23 +127,23 @@ export function WorkspaceForm() {
 
           <div>
             <label
-              htmlFor="name"
+              htmlFor="email"
               className="mb-3 block h-[15.5px] w-[400px] max-w-full rounded-none text-[13px] leading-normal font-medium tracking-normal text-[#686b72]"
             >
               Email
             </label>
             <input
-              {...register("name")}
-              id="name"
-              type="text"
-              autoComplete="organization"
-              aria-invalid={Boolean(errors.name)}
-              aria-describedby={errors.name ? "name-error" : undefined}
+              {...register("email")}
+              id="email"
+              type="email"
+              autoComplete="email"
+              aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? "email-error" : undefined}
               className={fieldClassName}
             />
-            {errors.name && (
-              <p id="name-error" role="alert" className="mb-0 mt-2 text-[13px] text-[#b42318]">
-                {errors.name.message}
+            {errors.email && (
+              <p id="email-error" role="alert" className="mb-0 mt-2 text-[13px] text-[#b42318]">
+                {errors.email.message}
               </p>
             )}
           </div>
@@ -170,9 +190,9 @@ export function WorkspaceForm() {
             Create workspace
           </button>
 
-          {submitted && (
-            <p role="status" className="m-0 text-center text-[13px] text-[#68704f]">
-              Your workspace details are ready.
+          {serverError && (
+            <p role="alert" className="m-0 text-center text-[13px] text-[#b42318]">
+              {serverError}
             </p>
           )}
         </form>
