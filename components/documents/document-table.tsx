@@ -5,8 +5,10 @@ import { useEffect, useRef } from "react";
 import { useStableDocumentSearch, DOCUMENTS_PAGE_SIZE } from "@/components/documents/use-stable-paginated-query";
 import { DocumentEmptyState } from "@/components/documents/document-empty-state";
 import { DocumentTableHeader } from "@/components/documents/document-table-header";
-
-const tableColumns = "grid-cols-[minmax(0,1fr)_120px_92px_82px_82px_28px]";
+import {
+  DocumentRowSkeleton,
+  documentTableColumns,
+} from "@/components/documents/document-row-skeleton";
 const SIZE_UNITS = ["B", "KB", "MB", "GB", "TB"];
 const dateFormatter = new Intl.DateTimeFormat("en-US", { day: "numeric", month: "short" });
 
@@ -48,9 +50,13 @@ export function DocumentTable({ searchTerm }: { searchTerm: string }) {
 
   return (
     <div className="-mx-[18px] mt-5 w-[calc(100%+36px)] overflow-hidden text-[#24252a]">
-      <DocumentTableHeader columnsClassName={tableColumns} />
+      <DocumentTableHeader columnsClassName={documentTableColumns} />
 
-      {status !== "LoadingFirstPage" ? (
+      {status === "LoadingFirstPage" ? (
+        Array.from({ length: 4 }).map((_, index) => (
+          <DocumentRowSkeleton key={index} index={index} />
+        ))
+      ) : (
         <>
           {results.map((doc) => {
             const isUploading = doc.status === "Uploading";
@@ -58,7 +64,7 @@ export function DocumentTable({ searchTerm }: { searchTerm: string }) {
               <div
                 key={doc._id}
                 role="row"
-                className={`group grid h-11 items-center ${tableColumns} pl-[60px] pr-8 text-[12px] leading-4 text-[#3f4148] transition-colors hover:bg-[#f7f7f8]`}
+                className={`group grid h-11 items-center ${documentTableColumns} pl-[60px] pr-8 text-[12px] leading-4 text-[#3f4148] transition-colors hover:bg-[#f7f7f8]`}
               >
                 <div className="flex min-w-0 items-center gap-2">
                   <span aria-hidden="true" className="flex size-[18px] shrink-0 items-center justify-center">
@@ -104,7 +110,7 @@ export function DocumentTable({ searchTerm }: { searchTerm: string }) {
 
           <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
         </>
-      ) : null}
+      )}
     </div>
   );
 }

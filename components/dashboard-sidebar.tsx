@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useConvexAuth, useQuery } from "convex/react";
@@ -11,9 +12,10 @@ import {
   CreditCard,
   Files,
   MousePointer2,
-  Search,
+  PanelLeftClose,
   UserRound,
 } from "lucide-react";
+import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 
@@ -107,19 +109,24 @@ function SidebarItemButton({
 }
 
 export function DashboardSidebar() {
-  const collapsed = false;
+  const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const { isAuthenticated } = useConvexAuth();
   const currentUser = useQuery(
     api.users.current,
     isAuthenticated ? {} : "skip",
   );
-  const displayName = currentUser?.name?.trim() || currentUser?.email || "Workspace";
+  const displayName = currentUser?.name?.trim() || currentUser?.email?.trim() || "Workspace";
+  const profileImage = currentUser?.image?.trim() || null;
   const initials = getInitials(displayName);
 
   return (
     <aside
+      id="dashboard-sidebar"
       aria-label="Dashboard sidebar"
+      onClick={() => {
+        if (collapsed) setCollapsed(false);
+      }}
       className={`box-border flex h-full shrink-0 flex-col overflow-y-auto overscroll-contain bg-sidebar-bg pt-2 pb-3 text-sidebar-text transition-[width] duration-[140ms] ease-in-out motion-reduce:transition-none ${
         collapsed ? "w-16 px-2" : "w-[244px] px-3"
       }`}
@@ -133,7 +140,7 @@ export function DashboardSidebar() {
       >
         <button
           type="button"
-          aria-label="Open workspace menu"
+          aria-label={collapsed ? `${displayName} workspace menu` : "Open workspace menu"}
           title={collapsed ? displayName : undefined}
           className={`flex h-7 min-w-0 items-center rounded-[10px] text-left text-sidebar-text transition-colors duration-100 ease-out hover:bg-[#f3f3f4] ${focusRingClassName} motion-reduce:transition-none ${
             collapsed
@@ -141,35 +148,43 @@ export function DashboardSidebar() {
               : "flex-1 gap-1.5 px-[5px] pr-[9px]"
           }`}
         >
-          <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-sidebar-avatar text-[10px] leading-none font-semibold tracking-[-0.02em] text-white">
-            {initials}
+          <span className="inline-flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-sidebar-avatar text-[10px] leading-none font-semibold tracking-[-0.02em] text-white">
+            {profileImage ? (
+              <Image
+                src={profileImage}
+                alt=""
+                width={20}
+                height={20}
+                className="size-5 object-cover"
+              />
+            ) : (
+              initials
+            )}
           </span>
           {!collapsed && (
-            <>
-              <span className="truncate text-[13px] leading-[23px] font-[550]">
-                {displayName}
-              </span>
-              <ChevronDown
-                aria-hidden="true"
-                className="size-2 shrink-0 text-[#858890]"
-                strokeWidth={iconStrokeWidth}
-              />
-            </>
+            <span className="truncate text-[13px] leading-[23px] font-[550]">
+              {displayName}
+            </span>
           )}
         </button>
 
-        <button
-          type="button"
-          aria-label="Search"
-          title="Search"
-          className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#73767e] transition-colors duration-100 ease-out hover:bg-[#f3f3f4] hover:text-[#34363c] ${focusRingClassName} motion-reduce:transition-none`}
-        >
-          <Search
-            aria-hidden="true"
-            className={iconClassName}
-            strokeWidth={iconStrokeWidth}
-          />
-        </button>
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={() => setCollapsed(true)}
+            aria-label="Close sidebar"
+            aria-controls="dashboard-sidebar"
+            aria-expanded="true"
+            title="Close sidebar"
+            className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#73767e] transition-colors duration-100 ease-out hover:bg-[#f3f3f4] hover:text-[#34363c] ${focusRingClassName} motion-reduce:transition-none`}
+          >
+            <PanelLeftClose
+              aria-hidden="true"
+              className={iconClassName}
+              strokeWidth={iconStrokeWidth}
+            />
+          </button>
+        )}
       </div>
 
       <nav

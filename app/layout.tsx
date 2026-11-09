@@ -5,6 +5,7 @@ import { Suspense, type ReactNode } from "react";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { Navbar } from "@/components/navbar";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const inter = Inter({
@@ -38,10 +39,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${inter.variable} ${geistMono.variable} h-full antialiased scroll-smooth motion-reduce:scroll-auto`}
     >
       <body className="min-h-full flex flex-col">
-        <Navbar />
+        <Suspense fallback={null}>
+          <Navbar />
+        </Suspense>
         <Suspense
           fallback={
             <div
@@ -58,6 +62,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           <ConvexAuthServerBoundary>{children}</ConvexAuthServerBoundary>
         </Suspense>
+        <Toaster position="bottom-right" />
       </body>
     </html>
   );

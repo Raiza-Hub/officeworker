@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef } from "react";
-import { useConvexAuth, usePaginatedQuery } from "convex/react";
+import { useConvexAuth } from "convex/react";
+import { usePaginatedQuery } from "convex-helpers/react/cache/hooks";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 
