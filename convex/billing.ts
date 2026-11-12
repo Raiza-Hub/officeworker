@@ -60,9 +60,25 @@ export const recentTransactions = query({
 
 export const checkBalance = query({
   args: { requiredAmount: v.optional(v.number()) },
+  // Discriminated union so callers narrow with `if (!balance.authenticated)`
+  // and get non-optional plan/available/requiredAmount afterwards.
+  returns: v.union(
+    v.object({
+      authenticated: v.literal(false),
+      sufficient: v.literal(false),
+    }),
+    v.object({
+      authenticated: v.literal(true),
+      plan: v.string(),
+      available: v.number(),
+      requiredAmount: v.number(),
+      sufficient: v.boolean(),
+    }),
+  ),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (userId === null) return { authenticated: false, sufficient: false };
+    if (userId === null)
+      return { authenticated: false, sufficient: false } as const;
     const wallet = await ctx.db
       .query("wallets")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -76,7 +92,7 @@ export const checkBalance = query({
       available,
       requiredAmount,
       sufficient: available >= requiredAmount,
-    };
+    } as const;
   },
 });
 

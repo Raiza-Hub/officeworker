@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { presignUpload, putObjectToR2 } from "@/lib/attachments";
+import { BLOCKED_MEDIA_MESSAGE, isBlockedMediaFile } from "@/lib/blocked-media";
 
 const FALLBACK_CONTENT_TYPE = "application/octet-stream";
 
@@ -14,16 +16,6 @@ type UploadDocumentsButtonProps = {
   icon?: "upload" | "plus";
   className?: string;
 };
-
-async function readResponseError(response: Response, fallback: string): Promise<string> {
-  try {
-    const data = (await response.json()) as { error?: string };
-    if (typeof data.error === "string" && data.error.length > 0) return data.error;
-  } catch {
-    return fallback;
-  }
-  return fallback;
-}
 
 export function UploadDocumentsButton({
   label = "Upload",
@@ -45,9 +37,21 @@ export function UploadDocumentsButton({
     event.target.value = "";
     if (files.length === 0) return;
 
+    const acceptedFiles = files.filter((file) => {
+      if (isBlockedMediaFile(file)) {
+        toast.error(`"${file.name}" — ${BLOCKED_MEDIA_MESSAGE}`);
+        return false;
+      }
+      return true;
+    });
+    if (acceptedFiles.length === 0) return;
+
     setIsUploading(true);
-    await Promise.allSettled(files.map((file) => beginUpload(file)));
-    setIsUploading(false);
+    try {
+      await Promise.allSettled(acceptedFiles.map((file) => beginUpload(file)));
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   function beginUpload(file: File) {
@@ -60,16 +64,11 @@ export function UploadDocumentsButton({
 
   async function uploadFile(file: File) {
     const contentType = file.type || FALLBACK_CONTENT_TYPE;
-    const presignResponse = await fetch("/api/documents/upload-url", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileName: file.name, fileType: contentType, fileSize: file.size }),
+    const presign = await presignUpload({
+      name: file.name,
+      size: file.size,
+      type: contentType,
     });
-    if (!presignResponse.ok) {
-      throw new Error(await readResponseError(presignResponse, `Could not prepare upload (${presignResponse.status})`));
-    }
-
-    const presign = (await presignResponse.json()) as { url: string; key: string };
     const documentId = (await createDocument({
       name: file.name,
       type: contentType,
@@ -78,18 +77,7 @@ export function UploadDocumentsButton({
     })) as Id<"documents">;
 
     try {
-      const uploadResponse = await fetch(presign.url, {
-        method: "PUT",
-        headers: { "Content-Type": contentType },
-        body: file,
-      });
-      if (!uploadResponse.ok) {
-        throw new Error(
-          uploadResponse.status === 403
-            ? "R2 rejected the upload (403). Check the bucket CORS policy and Content-Type, then try again."
-            : `R2 upload failed (${uploadResponse.status})`,
-        );
-      }
+      await putObjectToR2(presign.url, file, contentType);
     } catch (error) {
       // The upload may have written the object before the client saw the
       // failure, so ask the server to remove it before dropping the record.

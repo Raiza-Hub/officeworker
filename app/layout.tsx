@@ -63,6 +63,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <ConvexAuthServerBoundary>{children}</ConvexAuthServerBoundary>
         </Suspense>
         <Toaster position="bottom-right" />
+        <div id="portal" className="fixed left-0 top-0 z-40" />
       </body>
     </html>
   );

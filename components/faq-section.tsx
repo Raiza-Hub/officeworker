@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { m, useReducedMotion } from "motion/react";
 
 const FAQ_ITEMS = [
   {
@@ -49,7 +49,6 @@ const FAQ_ITEMS = [
 export function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const shouldReduceMotion = useReducedMotion();
-  const motionDuration = shouldReduceMotion ? 0 : 0.22;
 
   return (
     <section
@@ -92,7 +91,7 @@ export function FAQSection() {
                       className="flex min-h-[88px] w-full cursor-pointer items-center justify-between gap-6 py-5 text-left text-[16px] leading-[1.3] font-medium text-[#36393f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black/30"
                     >
                       <span>{item.question}</span>
-                      <motion.svg
+                      <m.svg
                         aria-hidden="true"
                         viewBox="0 0 24 24"
                         fill="none"
@@ -106,21 +105,22 @@ export function FAQSection() {
                           strokeWidth="1.8"
                           strokeLinecap="round"
                         />
-                      </motion.svg>
+                      </m.svg>
                     </button>
                   </h3>
-                  <motion.div
+                  <m.div
                     id={panelId}
                     role="region"
                     aria-labelledby={triggerId}
                     aria-hidden={!isOpen}
                     initial={false}
-                    animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
+                    layout
+                    style={{
+                      height: isOpen ? "auto" : 0,
+                      pointerEvents: isOpen ? undefined : "none",
+                    }}
+                    animate={{ opacity: isOpen ? 1 : 0 }}
                     transition={{
-                      height: {
-                        duration: motionDuration,
-                        ease: [0.23, 1, 0.32, 1],
-                      },
                       opacity: {
                         duration: shouldReduceMotion ? 0 : 0.16,
                         ease: "easeOut",
@@ -131,7 +131,7 @@ export function FAQSection() {
                     <p className="m-0 max-w-[68ch] pb-8 pr-12 text-[16px] leading-[1.65] text-[#686b72]">
                       {item.answer}
                     </p>
-                  </motion.div>
+                    </m.div>
                 </div>
               );
             })}

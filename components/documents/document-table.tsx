@@ -10,7 +10,11 @@ import {
   documentTableColumns,
 } from "@/components/documents/document-row-skeleton";
 const SIZE_UNITS = ["B", "KB", "MB", "GB", "TB"];
-const dateFormatter = new Intl.DateTimeFormat("en-US", { day: "numeric", month: "short" });
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+});
 
 function formatBytes(size: number): string {
   if (size <= 0) return "0 B";
