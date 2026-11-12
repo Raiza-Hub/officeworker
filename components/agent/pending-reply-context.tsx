@@ -1,8 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
-import type { ChatAttachment } from "@/components/agent/agent-composer";
+import type { ChatAttachment } from "@/lib/attachments";
 
 export type PendingReply = {
   threadId: string;
@@ -51,16 +57,19 @@ export function PendingReplyProvider({ children }: { children: ReactNode }) {
     setNavigation({ threadId, source: "activity" });
   }, []);
 
+  const contextValue = useMemo(
+    () => ({
+      pending,
+      setPending,
+      clearPending,
+      navigation,
+      markActivityNavigation,
+    }),
+    [pending, navigation, setPending, clearPending, markActivityNavigation],
+  );
+
   return (
-    <PendingReplyContext.Provider
-      value={{
-        pending,
-        setPending,
-        clearPending,
-        navigation,
-        markActivityNavigation,
-      }}
-    >
+    <PendingReplyContext.Provider value={contextValue}>
       {children}
     </PendingReplyContext.Provider>
   );

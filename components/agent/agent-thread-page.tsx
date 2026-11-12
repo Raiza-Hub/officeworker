@@ -1,15 +1,13 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { optimisticallySendMessage } from "@convex-dev/agent/react";
 import { api } from "@/convex/_generated/api";
 import { AgentChatHeader } from "@/components/agent/agent-chat-header";
-import {
-  AgentComposer,
-  type ChatAttachment,
-} from "@/components/agent/agent-composer";
+import { AgentComposer } from "@/components/agent/agent-composer";
+import { type ChatAttachment } from "@/lib/attachments";
 import {
   ComposerPrefillContext,
 } from "@/components/agent/composer-context";
@@ -80,19 +78,28 @@ export function AgentThreadFrame({
     }
   }
 
+  const titleContextValue = useMemo(
+    () => ({ title: preloadedTitle, setTitle: setPreloadedTitle }),
+    [preloadedTitle],
+  );
+  const messagesStatusContextValue = useMemo(
+    () => ({
+      status: messagesStatus,
+      setStatus: setMessagesStatus,
+      activeTurn,
+      setActiveTurn,
+    }),
+    [messagesStatus, activeTurn],
+  );
+  const composerPrefillContextValue = useMemo(
+    () => ({ prefill: setPrompt }),
+    [],
+  );
+
   return (
-    <ThreadTitleContext.Provider
-      value={{ title: preloadedTitle, setTitle: setPreloadedTitle }}
-    >
-      <MessagesStatusContext.Provider
-        value={{
-          status: messagesStatus,
-          setStatus: setMessagesStatus,
-          activeTurn,
-          setActiveTurn,
-        }}
-      >
-        <ComposerPrefillContext.Provider value={{ prefill: setPrompt }}>
+    <ThreadTitleContext.Provider value={titleContextValue}>
+      <MessagesStatusContext.Provider value={messagesStatusContextValue}>
+        <ComposerPrefillContext.Provider value={composerPrefillContextValue}>
           <div className="flex h-full min-h-0 flex-col bg-agent-page-bg text-[#24252a]">
             <AgentChatHeader
               title={preloadedTitle ?? "New chat"}

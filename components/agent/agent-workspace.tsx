@@ -6,10 +6,8 @@ import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { AgentChatHeader } from "@/components/agent/agent-chat-header";
-import {
-  AgentComposer,
-  type ChatAttachment,
-} from "@/components/agent/agent-composer";
+import { AgentComposer } from "@/components/agent/agent-composer";
+import { type ChatAttachment } from "@/lib/attachments";
 import { AgentExamples } from "@/components/agent/agent-examples";
 import { usePendingReply } from "@/components/agent/pending-reply-context";
 
