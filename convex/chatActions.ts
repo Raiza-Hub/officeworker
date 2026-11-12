@@ -87,37 +87,50 @@ async function buildAttachmentMessages(
   const fileParts: Extract<ModelMessage, { role: "user" }>["content"] = [];
   const textChunks: string[] = [];
 
-  for (const attachment of attachments) {
-    const isSpreadsheet =
-      attachment.mediaType.includes("sheet") ||
-      attachment.mediaType.includes("csv") ||
-      /\.(xlsx|xls|csv)$/i.test(attachment.name);
+  const results = await Promise.all(
+    attachments.map(async (attachment) => {
+      const isSpreadsheet =
+        attachment.mediaType.includes("sheet") ||
+        attachment.mediaType.includes("csv") ||
+        /\.(xlsx|xls|csv)$/i.test(attachment.name);
 
-    if (isSpreadsheet) {
-      const bytes = await fetchObjectBytes(attachment.key);
-      const text = await spreadsheetToText(Buffer.from(bytes), attachment.name);
-      textChunks.push(text);
-      continue;
+      if (isSpreadsheet) {
+        const bytes = await fetchObjectBytes(attachment.key);
+        const text = await spreadsheetToText(Buffer.from(bytes), attachment.name);
+        return { kind: "text" as const, text };
+      }
+
+      const inline =
+        attachment.mediaType.startsWith("image/") ||
+        attachment.mediaType === "application/pdf";
+
+      if (inline && attachment.size <= 10 * 1024 * 1024) {
+        const bytes = await fetchObjectBytes(attachment.key);
+        return {
+          kind: "file" as const,
+          part: {
+            type: "file" as const,
+            data: new Uint8Array(bytes),
+            mediaType: attachment.mediaType,
+            filename: attachment.name,
+          },
+        };
+      }
+
+      return {
+        kind: "note" as const,
+        note: `[Attached file: ${attachment.name} (${attachment.mediaType}, ${attachment.size} bytes) - not readable inline]`,
+      };
+    }),
+  );
+  for (const result of results) {
+    if (result.kind === "text") {
+      textChunks.push(result.text);
+    } else if (result.kind === "file") {
+      fileParts.push(result.part);
+    } else {
+      textChunks.push(result.note);
     }
-
-    const inline =
-      attachment.mediaType.startsWith("image/") ||
-      attachment.mediaType === "application/pdf";
-
-    if (inline && attachment.size <= 10 * 1024 * 1024) {
-      const bytes = await fetchObjectBytes(attachment.key);
-      fileParts.push({
-        type: "file",
-        data: new Uint8Array(bytes),
-        mediaType: attachment.mediaType,
-        filename: attachment.name,
-      });
-      continue;
-    }
-
-    textChunks.push(
-      `[Attached file: ${attachment.name} (${attachment.mediaType}, ${attachment.size} bytes) - not readable inline]`,
-    );
   }
 
   const messages: ModelMessage[] = [];

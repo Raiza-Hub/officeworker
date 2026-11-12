@@ -26,7 +26,7 @@ function SortableHeader({ children, sorted = false }: { children: string; sorted
 
 function ActivityTableHeader() {
   return (
-    <div role="row" className={`grid h-8 items-center ${activityTableColumns} text-[#5b5d65]`}>
+    <div className={`grid h-8 items-center ${activityTableColumns} text-[#5b5d65]`}>
       <span aria-hidden="true" />
       <div className="flex items-center pl-0">
         <SortableHeader sorted>Name</SortableHeader>
@@ -67,9 +67,9 @@ export function ActivityTable() {
   }));
 
   return (
-    <div role="table" aria-label="Chat activity" className="min-w-[900px] text-[#24252a]">
+    <div className="min-w-[900px] text-[#24252a]">
       <ActivityTableHeader />
-      <div role="rowgroup">
+      <ul aria-label="Chat activity" className="list-none">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, index) => (
             <ActivityRowSkeleton key={index} index={index} />
@@ -80,13 +80,13 @@ export function ActivityTable() {
               <ActivityRow key={row.threadId} label={row} />
             ))}
             {rows.length === 0 && (
-              <div className="px-[2.5px] py-6 text-[13px] leading-[20px] text-[#85878e]">
+              <li className="list-none px-[2.5px] py-6 text-[13px] leading-[20px] text-[#85878e]">
                 No chats yet. Start one from the Agent page.
-              </div>
+              </li>
             )}
           </>
         )}
-      </div>
+      </ul>
     </div>
   );
 }

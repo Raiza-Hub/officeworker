@@ -8,6 +8,9 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { PreviewModal } from "@/components/agent/preview-modal";
 import { useComposerPrefill } from "@/components/agent/composer-context";
+import { fetchDownloadUrl } from "@/components/agent/preview-url-cache";
+import { downloadFileUrl } from "@/lib/download";
+import { isPreviewSupported } from "@/lib/file-types";
 
 const statusStyles: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-[#f4f4f5] text-[#5b5d65]" },
@@ -19,19 +22,6 @@ const statusStyles: Record<string, { label: string; className: string }> = {
   failed: { label: "Failed", className: "bg-[#fdecec] text-[#b42318]" },
   cancelled: { label: "Cancelled", className: "bg-[#f4f4f5] text-[#85878e]" },
 };
-
-async function presign(storageKey: string): Promise<{ url: string; filename: string }> {
-  const response = await fetch("/api/files/preview-url", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key: storageKey }),
-  });
-  const data = (await response.json()) as { url?: string; filename?: string; error?: string };
-  if (!response.ok || !data.url) {
-    throw new Error(data.error ?? "Could not prepare the file");
-  }
-  return { url: data.url, filename: data.filename ?? "file" };
-}
 
 export function SubmissionCard({ submissionId }: { submissionId: string }) {
   const submission = useQuery(api.submissions.getSubmission, {
@@ -60,13 +50,8 @@ export function SubmissionCard({ submissionId }: { submissionId: string }) {
   async function handleDownload() {
     if (!filledKey) return;
     try {
-      const { url, filename } = await presign(filledKey);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
+      const { url, filename } = await fetchDownloadUrl(filledKey);
+      downloadFileUrl(url, filename);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Download failed");
     }
@@ -114,15 +99,17 @@ export function SubmissionCard({ submissionId }: { submissionId: string }) {
 
       {filledName && filledKey && (
         <div className="mt-3 flex items-center gap-1.5">
-          <button
-            type="button"
-            aria-label={`Preview ${filledName}`}
-            onClick={() => setPreviewKey(filledKey)}
-            className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-[#45474e] transition-colors hover:bg-[#f4f4f5]"
-          >
-            <Eye aria-hidden="true" className="size-3.5" strokeWidth={2} />
-            Preview
-          </button>
+          {isPreviewSupported(filledName) ? (
+            <button
+              type="button"
+              aria-label={`Preview ${filledName}`}
+              onClick={() => setPreviewKey(filledKey)}
+              className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-[#45474e] transition-colors hover:bg-[#f4f4f5]"
+            >
+              <Eye aria-hidden="true" className="size-3.5" strokeWidth={2} />
+              Preview
+            </button>
+          ) : null}
           <button
             type="button"
             aria-label={`Edit ${filledName}`}
@@ -144,13 +131,11 @@ export function SubmissionCard({ submissionId }: { submissionId: string }) {
         </div>
       )}
 
-      {previewKey && (
-        <PreviewModal
-          storageKey={previewKey}
-          filename={filledName ?? "sheet.xlsx"}
-          onClose={() => setPreviewKey(null)}
-        />
-      )}
+      <PreviewModal
+        storageKey={previewKey}
+        filename={filledName ?? "sheet.xlsx"}
+        onClose={() => setPreviewKey(null)}
+      />
     </div>
   );
 }

@@ -6,11 +6,13 @@ import { Bell, CheckCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 
+const notificationTimeFormatter = new Intl.DateTimeFormat("en", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
 function formatNotificationTime(timestamp: number): string {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(timestamp);
+  return notificationTimeFormatter.format(timestamp);
 }
 
 export function ActivityNotifications() {
@@ -73,10 +75,10 @@ export function ActivityNotifications() {
       </button>
 
       {open && (
-        <section
-          role="dialog"
+        <dialog
+          open
           aria-label="Notifications"
-          className="absolute top-9 right-0 z-30 w-[min(360px,calc(100vw-32px))] overflow-hidden rounded-xl border border-[#e9e9ec] bg-white shadow-[0_12px_36px_rgba(25,26,31,0.14)]"
+          className="m-0 absolute top-9 right-0 z-30 block w-[min(360px,calc(100vw-32px))] overflow-hidden rounded-xl border border-[#e9e9ec] bg-white p-0 shadow-[0_12px_36px_rgba(25,26,31,0.14)]"
         >
           <div className="flex h-11 items-center justify-between border-b border-[#efeff1] px-3.5">
             <h2 className="text-[13px] font-semibold text-[#27282d]">
@@ -145,7 +147,7 @@ export function ActivityNotifications() {
               </ul>
             )}
           </div>
-        </section>
+        </dialog>
       )}
     </div>
   );

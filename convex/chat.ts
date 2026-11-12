@@ -85,16 +85,18 @@ export const startThread = mutation({
       threadId,
       lastActivityAt: Date.now(),
     });
-    for (const attachment of args.attachments ?? []) {
-      await ctx.db.insert("messageAttachments", {
-        messageId,
-        threadId,
-        key: attachment.key,
-        name: attachment.name,
-        mediaType: attachment.mediaType,
-        size: attachment.size,
-      });
-    }
+    await Promise.all(
+      (args.attachments ?? []).map((attachment) =>
+        ctx.db.insert("messageAttachments", {
+          messageId,
+          threadId,
+          key: attachment.key,
+          name: attachment.name,
+          mediaType: attachment.mediaType,
+          size: attachment.size,
+        }),
+      ),
+    );
     await ctx.scheduler.runAfter(0, internal.chatActions.generateThreadTitle, {
       threadId,
       promptText: prompt.slice(0, MAX_TITLE_PROMPT_CHARS),
@@ -135,16 +137,18 @@ export const sendMessage = mutation({
       threadId: args.threadId,
       prompt,
     });
-    for (const attachment of args.attachments ?? []) {
-      await ctx.db.insert("messageAttachments", {
-        messageId,
-        threadId: args.threadId,
-        key: attachment.key,
-        name: attachment.name,
-        mediaType: attachment.mediaType,
-        size: attachment.size,
-      });
-    }
+    await Promise.all(
+      (args.attachments ?? []).map((attachment) =>
+        ctx.db.insert("messageAttachments", {
+          messageId,
+          threadId: args.threadId,
+          key: attachment.key,
+          name: attachment.name,
+          mediaType: attachment.mediaType,
+          size: attachment.size,
+        }),
+      ),
+    );
     const activity = await ctx.db
       .query("threadActivity")
       .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
@@ -419,27 +423,25 @@ export const deleteThread = mutation({
   handler: async (ctx, args) => {
     await authorizeThreadAccess(ctx, args.threadId);
     await agent.deleteThreadAsync(ctx, { threadId: args.threadId });
-    const rows = await ctx.db
-      .query("threadActivity")
-      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-      .collect();
-    for (const row of rows) {
-      await ctx.db.delete(row._id);
-    }
-    const attachmentRows = await ctx.db
-      .query("messageAttachments")
-      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-      .collect();
-    for (const row of attachmentRows) {
-      await ctx.db.delete(row._id);
-    }
-    const timingRows = await ctx.db
-      .query("assistantTurnTimings")
-      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-      .collect();
-    for (const row of timingRows) {
-      await ctx.db.delete(row._id);
-    }
+    const [rows, attachmentRows, timingRows] = await Promise.all([
+      ctx.db
+        .query("threadActivity")
+        .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+        .collect(),
+      ctx.db
+        .query("messageAttachments")
+        .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+        .collect(),
+      ctx.db
+        .query("assistantTurnTimings")
+        .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+        .collect(),
+    ]);
+    await Promise.all(
+      [...rows, ...attachmentRows, ...timingRows].map((row) =>
+        ctx.db.delete(row._id),
+      ),
+    );
   },
 });
 
@@ -457,9 +459,9 @@ export const renameThread = mutation({
       .query("threadActivity")
       .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
       .collect();
-    for (const row of rows) {
-      await ctx.db.patch(row._id, { title });
-    }
+    await Promise.all(
+      rows.map((row) => ctx.db.patch(row._id, { title })),
+    );
   },
 });
 
@@ -471,8 +473,8 @@ export const setThreadTitle = internalMutation({
       .query("threadActivity")
       .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
       .collect();
-    for (const row of rows) {
-      await ctx.db.patch(row._id, { title: args.title });
-    }
+    await Promise.all(
+      rows.map((row) => ctx.db.patch(row._id, { title: args.title })),
+    );
   },
 });

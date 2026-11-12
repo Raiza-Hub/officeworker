@@ -1,6 +1,7 @@
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { isAuthenticatedNextjs } from "@convex-dev/auth/nextjs/server";
 import { z } from "zod";
+import { getRedis } from "@/lib/redis";
 import { createR2Client, getR2Config } from "../r2";
 
 const deleteObjectSchema = z.object({
@@ -36,6 +37,19 @@ export async function DELETE(request: Request) {
     await createR2Client(config).send(
       new DeleteObjectCommand({ Bucket: config.bucket, Key: parsed.key }),
     );
+
+    const redis = getRedis();
+    if (redis) {
+      try {
+        await redis.del(
+          `preview:view:${parsed.key}`,
+          `preview:dl:${parsed.key}`,
+        );
+      } catch (error) {
+        console.warn("Preview URL cache invalidation failed", error);
+      }
+    }
+
     return Response.json({ ok: true });
   } catch (error) {
     return Response.json(

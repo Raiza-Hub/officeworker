@@ -307,15 +307,17 @@ export const replaceScoreMappings = internalMutation({
       .query("scoreMappings")
       .withIndex("by_submission", (q) => q.eq("submissionId", args.submissionId))
       .collect();
-    for (const row of existing) {
-      await ctx.db.delete(row._id);
-    }
-    for (const mapping of args.mappings) {
-      await ctx.db.insert("scoreMappings", {
-        submissionId: args.submissionId,
-        ...mapping,
-      });
-    }
+    await Promise.all(
+      existing.map((row) => ctx.db.delete(row._id)),
+    );
+    await Promise.all(
+      args.mappings.map((mapping) =>
+        ctx.db.insert("scoreMappings", {
+          submissionId: args.submissionId,
+          ...mapping,
+        }),
+      ),
+    );
     return args.mappings.length;
   },
 });
