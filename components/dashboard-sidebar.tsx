@@ -127,6 +127,13 @@ export function DashboardSidebar() {
       onClick={() => {
         if (collapsed) setCollapsed(false);
       }}
+      onKeyDown={(event) => {
+        if (collapsed && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          setCollapsed(false);
+        }
+      }}
+      tabIndex={collapsed ? 0 : undefined}
       className={`box-border flex h-full shrink-0 flex-col overflow-y-auto overscroll-contain bg-sidebar-bg pt-2 pb-3 text-sidebar-text transition-[width] duration-[140ms] ease-in-out motion-reduce:transition-none ${
         collapsed ? "w-16 px-2" : "w-[244px] px-3"
       }`}

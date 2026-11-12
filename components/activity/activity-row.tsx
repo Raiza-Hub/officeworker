@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Check, MoreHorizontal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -24,7 +25,7 @@ export function ActivityRow({ label }: { label: Activity }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftName, setDraftName] = useState(label.name);
   const [isSaving, setIsSaving] = useState(false);
-  const rowRef = useRef<HTMLDivElement>(null);
+  const rowRef = useRef<HTMLLIElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { markActivityNavigation } = usePendingReply();
@@ -78,14 +79,7 @@ export function ActivityRow({ label }: { label: Activity }) {
     return () => observer.disconnect();
   }, [label.threadId, router]);
 
-  function openThread() {
-    if (isRenaming) return;
-    markActivityNavigation(label.threadId);
-    router.push(`/agent/${label.threadId}`);
-  }
-
   function prefetchThread() {
-    if (isRenaming) return;
     router.prefetch(`/agent/${label.threadId}`);
   }
 
@@ -133,19 +127,10 @@ export function ActivityRow({ label }: { label: Activity }) {
     "inline-flex size-7 shrink-0 items-center justify-center rounded-[7px] text-[#4b4c53] transition-colors hover:bg-[lch(94.6%_0_282)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/30 disabled:pointer-events-none disabled:opacity-35";
 
   return (
-    <div
+    <li
       ref={rowRef}
-      role="row"
-      className={`group relative grid h-11 ${activityTableColumns} items-center text-[13px] leading-[15.5px] text-[#3f4148] transition-colors hover:bg-[#fcfcfd] ${isMenuOpen || isRenaming ? "bg-[#fcfcfd]" : ""} ${isRenaming ? "" : "cursor-pointer"}`}
-      onClick={openThread}
+      className={`group relative grid h-11 list-none ${activityTableColumns} items-center text-[13px] leading-[15.5px] text-[#3f4148] transition-colors hover:bg-[#fcfcfd] ${isMenuOpen || isRenaming ? "bg-[#fcfcfd]" : ""} ${isRenaming ? "" : "cursor-pointer"}`}
       onMouseEnter={prefetchThread}
-      onFocus={prefetchThread}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" && event.target === event.currentTarget) {
-          openThread();
-        }
-      }}
-      tabIndex={isRenaming ? -1 : 0}
     >
       <span aria-hidden="true" />
 
@@ -198,9 +183,15 @@ export function ActivityRow({ label }: { label: Activity }) {
           </button>
         </form>
       ) : (
-        <div className="flex min-w-0 items-center gap-[17px] pl-[2.5px]">
+        <Link
+          href={`/agent/${label.threadId}`}
+          onClick={() => markActivityNavigation(label.threadId)}
+          onMouseEnter={prefetchThread}
+          onFocus={prefetchThread}
+          className="flex min-w-0 items-center gap-[17px] pl-[2.5px] after:absolute after:inset-0"
+        >
           <span className="truncate font-medium text-[#292a30]">{label.name}</span>
-        </div>
+        </Link>
       )}
 
       <span aria-hidden="true" />
@@ -220,7 +211,7 @@ export function ActivityRow({ label }: { label: Activity }) {
             event.stopPropagation();
             setIsMenuOpen((open) => !open);
           }}
-          className={`inline-flex size-8 items-center justify-center rounded-md text-[#656871] transition-[background-color,opacity] group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[#f1f1f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/30 ${isMenuOpen ? "bg-[#f1f1f2] opacity-100" : "opacity-0"}`}
+          className={`relative z-10 inline-flex size-8 items-center justify-center rounded-md text-[#656871] transition-[background-color,opacity] group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[#f1f1f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/30 ${isMenuOpen ? "bg-[#f1f1f2] opacity-100" : "opacity-0"}`}
         >
           <MoreHorizontal aria-hidden="true" className="size-4" strokeWidth={2.5} />
         </button>
@@ -233,6 +224,6 @@ export function ActivityRow({ label }: { label: Activity }) {
           onClose={() => setIsMenuOpen(false)}
         />
       )}
-    </div>
+    </li>
   );
 }

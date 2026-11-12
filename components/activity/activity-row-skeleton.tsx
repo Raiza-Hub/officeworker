@@ -6,10 +6,9 @@ export function ActivityRowSkeleton({ index = 0 }: { index?: number }) {
   const nameWidth = nameWidths[index % nameWidths.length];
 
   return (
-    <div
-      role="row"
+    <li
       aria-hidden="true"
-      className={`grid h-11 ${activityTableColumns} items-center text-[13px]`}
+      className={`grid h-11 list-none ${activityTableColumns} items-center text-[13px]`}
     >
       <span aria-hidden="true" />
       <div className="flex min-w-0 items-center pl-[2.5px]">
@@ -24,6 +23,6 @@ export function ActivityRowSkeleton({ index = 0 }: { index?: number }) {
       </div>
       <span aria-hidden="true" />
       <span aria-hidden="true" />
-    </div>
+    </li>
   );
 }

@@ -17,33 +17,29 @@ export default function Loading() {
         {/* Toolbar skeleton */}
         <div className="flex h-11 shrink-0 items-center justify-between px-[18px]">
           <div className="h-7 w-[300px] animate-pulse rounded-full bg-[#f3f3f4]" />
-          <div className="size-7 animate-pulse rounded-full bg-[#f3f3f4]" />
+          <div
+            aria-hidden="true"
+            className="size-7 animate-pulse rounded-full bg-[#f3f3f4]"
+          />
         </div>
 
-        {/* Table skeleton */}
+        {/* List skeleton */}
         <div
-          role="table"
-          aria-label="Chat activity"
-          className="min-w-[900px] text-[#24252a]"
+          className={`grid h-8 items-center ${activityTableColumns} text-[#5b5d65]`}
         >
-          <div
-            role="row"
-            className={`grid h-8 items-center ${activityTableColumns} text-[#5b5d65]`}
-          >
-            <span aria-hidden="true" />
-            <div className="h-3 w-10 animate-pulse rounded bg-[#e5e5e7]" />
-            <div className="h-3 w-12 animate-pulse rounded bg-[#e5e5e7]" />
-            <div className="h-3 w-16 animate-pulse rounded bg-[#e5e5e7]" />
-            <div className="h-3 w-14 animate-pulse rounded bg-[#e5e5e7]" />
-            <span aria-hidden="true" />
-            <span aria-hidden="true" />
-          </div>
-          <div role="rowgroup">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <ActivityRowSkeleton key={index} index={index} />
-            ))}
-          </div>
+          <span aria-hidden="true" />
+          <div className="h-3 w-10 animate-pulse rounded bg-[#e5e5e7]" />
+          <div className="h-3 w-12 animate-pulse rounded bg-[#e5e5e7]" />
+          <div className="h-3 w-16 animate-pulse rounded bg-[#e5e5e7]" />
+          <div className="h-3 w-14 animate-pulse rounded bg-[#e5e5e7]" />
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
         </div>
+        <ul aria-label="Chat activity" className="text-[#24252a]">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <ActivityRowSkeleton key={index} index={index} />
+          ))}
+        </ul>
       </div>
     </div>
   );
