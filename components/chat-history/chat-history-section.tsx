@@ -31,29 +31,27 @@ export function ChatHistorySection() {
             initial={
               reduceMotion
                 ? { opacity: 0 }
-                : { height: 0, opacity: 0, y: -4, filter: "blur(4px)" }
+                : { opacity: 0, y: -4, filter: "blur(4px)" }
             }
             animate={
               reduceMotion
                 ? { opacity: 1 }
-                : { height: "auto", opacity: 1, y: 0, filter: "blur(0px)" }
+                : { opacity: 1, y: 0, filter: "blur(0px)" }
             }
             exit={
               reduceMotion
                 ? { opacity: 0 }
-                : { height: 0, opacity: 0, y: -4, filter: "blur(4px)" }
+                : { opacity: 0, y: -4, filter: "blur(4px)" }
             }
             transition={
               reduceMotion
                 ? { duration: 0 }
                 : {
-                    height: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
-                    opacity: { duration: 0.2, ease: "easeOut" },
-                    y: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
-                    filter: { duration: 0.22, ease: "easeOut" },
+                    duration: 0.2,
+                    ease: "easeOut",
                   }
             }
-            className="-mx-1 overflow-hidden px-1 pt-[3px] pb-1"
+            className="pt-[3px] pb-1"
           >
             <ChatHistoryList />
           </m.div>

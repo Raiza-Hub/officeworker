@@ -82,8 +82,8 @@ export function SidebarNavContent() {
   const initials = getInitials(displayName);
 
   return (
-    <div className="box-border flex h-full w-[244px] shrink-0 flex-col overflow-hidden bg-sidebar-bg px-3 pt-2 pb-3 text-sidebar-text">
-      <div className="flex h-11 items-center gap-2">
+    <div className="box-border flex h-full w-[244px] shrink-0 flex-col overflow-hidden bg-sidebar-bg pt-2 text-sidebar-text">
+      <div className="flex h-11 shrink-0 items-center gap-2 px-3">
         <button
           type="button"
           aria-label="Open workspace menu"
@@ -126,7 +126,7 @@ export function SidebarNavContent() {
 
       <nav
         aria-label="Dashboard navigation"
-        className="mt-2 flex flex-col gap-px"
+        className="mt-2 flex flex-col gap-px px-3"
       >
         {mainItems.map((item) => (
           <SidebarNavLink
@@ -137,7 +137,7 @@ export function SidebarNavContent() {
         ))}
       </nav>
 
-      <div className="mt-4">
+      <div className="mt-4 shrink-0 px-3">
         <button
           type="button"
           aria-expanded={settingsExpanded}
@@ -168,11 +168,11 @@ export function SidebarNavContent() {
         )}
       </div>
 
-      <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-none px-3">
         <ChatHistorySection />
       </div>
 
-      <div className="shrink-0 pt-3">
+      <div className="shrink-0 px-3 pb-3 pt-3">
         <SignOutButton collapsed={false} />
       </div>
     </div>
