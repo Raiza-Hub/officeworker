@@ -1,7 +1,12 @@
+import { SidebarTrigger } from "@/components/sidebar/sidebar-trigger";
+
 export function ProfileHeading() {
   return (
-    <h1 className="m-0 h-8 px-4 text-[24px] leading-8 font-medium text-[#24252a]">
-      Profile
-    </h1>
+    <div className="flex h-8 items-center gap-2 px-4">
+      <SidebarTrigger />
+      <h1 className="m-0 text-[24px] leading-8 font-medium text-[#24252a]">
+        Profile
+      </h1>
+    </div>
   );
 }

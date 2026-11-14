@@ -144,7 +144,7 @@ export default defineSchema({
     .index("by_submission", ["submissionId"])
     .index("by_time", ["at"]),
 
-  // One row per user turn; powers the /activity chat-history list ordered by
+  // One row per user turn; powers the sidebar chat-history list ordered by
   // recent activity (documented @convex-dev/agent pattern).
   threadActivity: defineTable({
     userId: v.id("users"),
