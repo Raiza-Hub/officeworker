@@ -106,7 +106,7 @@ export function AgentThread({ threadId }: { threadId: string }) {
   const threadPending = pending?.threadId === threadId ? pending : null;
   const showInitialLoading =
     navigation?.threadId === threadId
-      ? navigation.source === "activity"
+      ? navigation.source === "history"
       : !threadPending;
 
   const results = useMemo(() => {

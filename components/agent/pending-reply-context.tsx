@@ -17,7 +17,7 @@ export type PendingReply = {
   attachments: ChatAttachment[];
 };
 
-export type ThreadNavigationSource = "agent" | "activity";
+export type ThreadNavigationSource = "agent" | "history";
 
 type ThreadNavigation = {
   threadId: string;
@@ -29,7 +29,7 @@ type PendingReplyContextValue = {
   setPending: (pending: PendingReply) => void;
   clearPending: () => void;
   navigation: ThreadNavigation | null;
-  markActivityNavigation: (threadId: string) => void;
+  markHistoryNavigation: (threadId: string) => void;
 };
 
 const PendingReplyContext = createContext<PendingReplyContextValue>({
@@ -37,7 +37,7 @@ const PendingReplyContext = createContext<PendingReplyContextValue>({
   setPending: () => undefined,
   clearPending: () => undefined,
   navigation: null,
-  markActivityNavigation: () => undefined,
+  markHistoryNavigation: () => undefined,
 });
 
 export function PendingReplyProvider({ children }: { children: ReactNode }) {
@@ -53,8 +53,8 @@ export function PendingReplyProvider({ children }: { children: ReactNode }) {
     setPendingState(null);
   }, []);
 
-  const markActivityNavigation = useCallback((threadId: string) => {
-    setNavigation({ threadId, source: "activity" });
+  const markHistoryNavigation = useCallback((threadId: string) => {
+    setNavigation({ threadId, source: "history" });
   }, []);
 
   const contextValue = useMemo(
@@ -63,9 +63,9 @@ export function PendingReplyProvider({ children }: { children: ReactNode }) {
       setPending,
       clearPending,
       navigation,
-      markActivityNavigation,
+      markHistoryNavigation,
     }),
-    [pending, navigation, setPending, clearPending, markActivityNavigation],
+    [pending, navigation, setPending, clearPending, markHistoryNavigation],
   );
 
   return (

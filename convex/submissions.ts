@@ -1,7 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
-import { notifications } from "./notification_client";
 
 const statusValidator = v.union(
   v.literal("draft"),
@@ -79,8 +78,6 @@ export const updateSubmission = internalMutation({
       // Already transitioned (e.g. duplicate callback) — treat as no-op.
       return { applied: false as const };
     }
-    const statusChanged =
-      args.status !== undefined && args.status !== submission.status;
     if (submission.chargeStatus === "charged") {
       return { applied: false as const };
     }
@@ -160,85 +157,6 @@ export const updateSubmission = internalMutation({
     }
 
     await ctx.db.patch(args.submissionId, patch);
-    if (statusChanged) {
-      const href = submission.threadId
-        ? `/agent/${submission.threadId}`
-        : "/activity";
-      const source = { type: "submission", id: String(args.submissionId) };
-      const dedupeKey =
-        `submission:${args.submissionId}:${submission.status}:` +
-        `${args.status}:${submission.updatedAt}`;
-      const subject = `${submission.subject} ${submission.term} ${submission.academicYear}`;
-
-      if (args.status === "awaiting_review") {
-        await notifications.create(ctx, {
-          targetId: submission.userId,
-          kind: "review_ready",
-          data: {
-            title: "Ready for your review",
-            body: `${subject} is ready. Review it before uploading.`,
-            href,
-          },
-          source,
-          dedupeKey,
-        });
-      } else if (args.status === "login_failed" || args.status === "failed") {
-        await notifications.create(ctx, {
-          targetId: submission.userId,
-          kind: "action_required",
-          data: {
-            title:
-              args.status === "login_failed"
-                ? "Portal sign-in needed"
-                : "Upload needs attention",
-            body:
-              args.status === "login_failed"
-                ? `Reconnect to the portal to continue ${subject}.`
-                : `${subject} could not be uploaded. Open the chat to see what happened.`,
-            href,
-          },
-          source,
-          dedupeKey,
-        });
-      } else if (args.status === "done") {
-        await notifications.create(ctx, {
-          targetId: submission.userId,
-          kind: "submission_completed",
-          data: {
-            title: "Submission completed",
-            body: `${subject} was uploaded successfully.`,
-            href,
-          },
-          source,
-          dedupeKey,
-        });
-
-        if (submission.chargeStatus === "reserved") {
-          const wallet = await ctx.db
-            .query("wallets")
-            .withIndex("by_user", (q) => q.eq("userId", submission.userId))
-            .first();
-          const available = Math.max(
-            0,
-            (wallet?.balance ?? 0) - (wallet?.reserved ?? 0),
-          );
-          const nextUploadCost = wallet?.plan === "pro" ? 1000 : 500;
-          if (available < nextUploadCost) {
-            await notifications.create(ctx, {
-              targetId: submission.userId,
-              kind: "billing",
-              data: {
-                title: "Wallet balance is low",
-                body: "Add credits before starting your next upload.",
-                href: "/billing",
-              },
-              source: { type: "wallet", id: String(submission.userId) },
-              dedupeKey: `wallet-low:${submission.userId}:${available}`,
-            });
-          }
-        }
-      }
-    }
     if (args.auditEvent !== undefined) {
       await ctx.db.insert("auditLog", {
         submissionId: args.submissionId,

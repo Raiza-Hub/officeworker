@@ -53,7 +53,6 @@ export function Navbar() {
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/documents") ||
     pathname.startsWith("/agent") ||
-    pathname.startsWith("/activity") ||
     pathname.startsWith("/profile") ||
     pathname.startsWith("/billing")
   ) {

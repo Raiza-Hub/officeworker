@@ -3,7 +3,6 @@ import { v } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation, query, mutation } from "./_generated/server";
-import { notifications } from "./notification_client";
 
 const DEFAULT_PLAN = "basic" as const;
 
@@ -149,17 +148,6 @@ export const failTopupIntent = mutation({
       .first();
     if (!intent || intent.userId !== userId || intent.status !== "pending") return;
     await ctx.db.patch(intent._id, { status: "failed" });
-    await notifications.create(ctx, {
-      targetId: userId,
-      kind: "billing",
-      data: {
-        title: "Wallet top-up failed",
-        body: `Your ₦${intent.amount.toLocaleString()} top-up could not be completed.`,
-        href: "/billing",
-      },
-      source: { type: "topup", id: intent.reference },
-      dedupeKey: `topup-failed:${intent.reference}`,
-    });
   },
 });
 
@@ -204,17 +192,6 @@ export const applyTopup = internalMutation({
       createdAt: Date.now(),
     });
     await ctx.db.patch(intent._id, { status: "paid" });
-    await notifications.create(ctx, {
-      targetId: intent.userId,
-      kind: "billing",
-      data: {
-        title: "Wallet topped up",
-        body: `₦${args.amount.toLocaleString()} was added to your wallet.`,
-        href: "/billing",
-      },
-      source: { type: "topup", id: intent.reference },
-      dedupeKey: `topup-paid:${intent.reference}`,
-    });
     return { applied: true };
   },
 });

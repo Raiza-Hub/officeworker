@@ -1,265 +1,88 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useConvexAuth, useQuery } from "convex/react";
-import type { LucideIcon } from "lucide-react";
-import {
-  Activity,
-  ChevronDown,
-  CircleHelp,
-  CreditCard,
-  Files,
-  MousePointer2,
-  PanelLeftClose,
-  UserRound,
-} from "lucide-react";
-import { useState } from "react";
-import { api } from "@/convex/_generated/api";
-import { SignOutButton } from "@/components/auth/sign-out-button";
-
-type SidebarItem = {
-  label: string;
-  icon: LucideIcon;
-  href?: string;
-  unread?: boolean;
-};
-
-const mainItems: SidebarItem[] = [
-  { label: "Agent", icon: MousePointer2, href: "/agent" },
-  { label: "Documents", icon: Files, href: "/documents" },
-  { label: "Activity", icon: Activity, href: "/activity" },
-];
-
-const workspaceItems: SidebarItem[] = [
-  { label: "Profile", icon: UserRound, href: "/profile" },
-  { label: "Billings", icon: CreditCard, href: "/billing" },
-];
-
-const iconClassName = "size-3.5 shrink-0";
-const iconStrokeWidth = 2.25;
-const focusRingClassName =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6069d9]/40";
-
-function getInitials(name: string) {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "U";
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
-}
-
-function SidebarItemButton({
-  item,
-  collapsed,
-  active,
-}: {
-  item: SidebarItem;
-  collapsed: boolean;
-  active: boolean;
-}) {
-  const Icon = item.icon;
-  const className = `relative box-border flex h-7 w-full items-center rounded-lg text-left text-[13px] leading-[15.5px] font-medium tracking-normal transition-colors duration-100 ease-out ${focusRingClassName} motion-reduce:transition-none ${
-    collapsed ? "justify-center px-0" : "gap-1.5 px-2"
-  } ${
-    active
-      ? "bg-sidebar-active text-sidebar-foreground"
-      : "text-sidebar-muted hover:bg-[#f3f3f4] hover:text-sidebar-foreground"
-  }`;
-  const controlProps = {
-    "aria-label": item.label,
-    "aria-current": active ? ("page" as const) : undefined,
-    title: collapsed ? item.label : undefined,
-    className,
-  };
-  const content = (
-    <>
-      <Icon
-        aria-hidden="true"
-        className={iconClassName}
-        strokeWidth={iconStrokeWidth}
-      />
-      {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
-      {item.unread && (
-        <span
-          aria-hidden="true"
-          className={`rounded-full bg-sidebar-unread ${
-            collapsed
-              ? "absolute top-1.5 right-1.5 size-1.5"
-              : "ml-auto size-2"
-          }`}
-        />
-      )}
-    </>
-  );
-
-  if (item.href) {
-    return (
-      <Link href={item.href} {...controlProps}>
-        {content}
-      </Link>
-    );
-  }
-
-  return (
-    <button type="button" {...controlProps}>
-      {content}
-    </button>
-  );
-}
+import { useEffect, useRef, useState } from "react";
+import { SidebarNavContent } from "@/components/sidebar/sidebar-nav-content";
+import { useSidebar } from "@/components/sidebar/sidebar-context";
+import { useLockBodyScroll } from "@/components/sidebar/use-lock-body-scroll";
+import { useMobileSidebarFocus } from "@/components/sidebar/use-mobile-sidebar-focus";
 
 export function DashboardSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
-  const pathname = usePathname();
-  const { isAuthenticated } = useConvexAuth();
-  const currentUser = useQuery(
-    api.users.current,
-    isAuthenticated ? {} : "skip",
+  const { isMobile, openMobile, setOpenMobile, openDesktop } = useSidebar();
+  const sidebarRef = useRef<HTMLElement>(null);
+  const [enteringDesktop, setEnteringDesktop] = useState(false);
+  const [enteringMobile, setEnteringMobile] = useState(false);
+  const prevIsMobileRef = useRef(isMobile);
+
+  useEffect(() => {
+    if (prevIsMobileRef.current === isMobile) return;
+    const wasMobile = prevIsMobileRef.current;
+    prevIsMobileRef.current = isMobile;
+    let frame1 = 0;
+    let frame2 = 0;
+    frame1 = requestAnimationFrame(() => {
+      if (wasMobile && !isMobile) {
+        if (openDesktop) setEnteringDesktop(true);
+      } else if (!wasMobile && isMobile) {
+        setEnteringMobile(true);
+      }
+      frame2 = requestAnimationFrame(() => {
+        setEnteringDesktop(false);
+        setEnteringMobile(false);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame1);
+      cancelAnimationFrame(frame2);
+    };
+  }, [isMobile, openDesktop]);
+
+  useLockBodyScroll(isMobile && openMobile);
+  useMobileSidebarFocus(
+    sidebarRef,
+    isMobile && openMobile,
+    () => setOpenMobile(false),
   );
-  const displayName = currentUser?.name?.trim() || currentUser?.email?.trim() || "Workspace";
-  const profileImage = currentUser?.image?.trim() || null;
-  const initials = getInitials(displayName);
+
+  const renderDesktopOpen = enteringDesktop ? false : openDesktop;
+  const renderMobileOpen = enteringMobile ? false : openMobile;
+  const mobileOpen = isMobile && renderMobileOpen;
+  const ease = "ease-[cubic-bezier(0.16,1,0.3,1)]";
 
   return (
-    <aside
-      id="dashboard-sidebar"
-      aria-label="Dashboard sidebar"
-      onClick={() => {
-        if (collapsed) setCollapsed(false);
-      }}
-      onKeyDown={(event) => {
-        if (collapsed && (event.key === "Enter" || event.key === " ")) {
-          event.preventDefault();
-          setCollapsed(false);
+    <>
+      <div
+        aria-hidden="true"
+        className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ${ease} motion-reduce:transition-none ${
+          mobileOpen
+            ? "pointer-events-auto opacity-100"
+            : "pointer-events-none opacity-0"
+        }`}
+        onClick={() => {
+          if (isMobile && openMobile) setOpenMobile(false);
+        }}
+      />
+      <aside
+        id="dashboard-sidebar"
+        ref={sidebarRef}
+        aria-label="Dashboard sidebar"
+        aria-hidden={isMobile && !renderMobileOpen ? true : undefined}
+        aria-modal={isMobile && openMobile ? true : undefined}
+        role={isMobile && openMobile ? "dialog" : undefined}
+        tabIndex={-1}
+        className={
+          isMobile
+            ? `fixed inset-y-0 left-0 z-50 h-full w-[244px] shrink-0 overflow-hidden bg-sidebar-bg transition-transform duration-300 ${ease} motion-reduce:transition-none ${
+                renderMobileOpen
+                  ? "pointer-events-auto translate-x-0 shadow-xl"
+                  : "pointer-events-none -translate-x-full"
+              }`
+            : `hidden h-full shrink-0 overflow-hidden bg-sidebar-bg transition-[width] duration-300 ${ease} motion-reduce:transition-none md:block ${
+                renderDesktopOpen ? "w-[244px]" : "w-0"
+              }`
         }
-      }}
-      tabIndex={collapsed ? 0 : undefined}
-      className={`box-border flex h-full shrink-0 flex-col overflow-y-auto overscroll-contain bg-sidebar-bg pt-2 pb-3 text-sidebar-text transition-[width] duration-[140ms] ease-in-out motion-reduce:transition-none ${
-        collapsed ? "w-16 px-2" : "w-[244px] px-3"
-      }`}
-    >
-      <div
-        className={`flex ${
-          collapsed
-            ? "flex-col items-center gap-1"
-            : "h-11 items-center gap-2"
-        }`}
       >
-        <button
-          type="button"
-          aria-label={collapsed ? `${displayName} workspace menu` : "Open workspace menu"}
-          title={collapsed ? displayName : undefined}
-          className={`flex h-7 min-w-0 items-center rounded-[10px] text-left text-sidebar-text transition-colors duration-100 ease-out hover:bg-[#f3f3f4] ${focusRingClassName} motion-reduce:transition-none ${
-            collapsed
-              ? "w-7 justify-center px-0"
-              : "flex-1 gap-1.5 px-[5px] pr-[9px]"
-          }`}
-        >
-          <span className="inline-flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-sidebar-avatar text-[10px] leading-none font-semibold tracking-[-0.02em] text-white">
-            {profileImage ? (
-              <Image
-                src={profileImage}
-                alt=""
-                width={20}
-                height={20}
-                className="size-5 object-cover"
-              />
-            ) : (
-              initials
-            )}
-          </span>
-          {!collapsed && (
-            <span className="truncate text-[13px] leading-[23px] font-[550]">
-              {displayName}
-            </span>
-          )}
-        </button>
-
-        {!collapsed && (
-          <button
-            type="button"
-            onClick={() => setCollapsed(true)}
-            aria-label="Close sidebar"
-            aria-controls="dashboard-sidebar"
-            aria-expanded="true"
-            title="Close sidebar"
-            className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#73767e] transition-colors duration-100 ease-out hover:bg-[#f3f3f4] hover:text-[#34363c] ${focusRingClassName} motion-reduce:transition-none`}
-          >
-            <PanelLeftClose
-              aria-hidden="true"
-              className={iconClassName}
-              strokeWidth={iconStrokeWidth}
-            />
-          </button>
-        )}
-      </div>
-
-      <nav
-        aria-label="Dashboard navigation"
-        className="mt-2 flex flex-col gap-px"
-      >
-        {mainItems.map((item) => (
-          <SidebarItemButton
-            key={item.label}
-            item={item}
-            collapsed={collapsed}
-            active={item.href === pathname}
-          />
-        ))}
-      </nav>
-
-      <div className="mt-4">
-        {!collapsed && (
-          <button
-            type="button"
-            aria-expanded="true"
-            className={`flex h-7 w-full items-center gap-1 rounded-lg px-[5px] text-left text-[12px] leading-[14px] font-medium text-[#62656d] transition-colors duration-100 ease-out hover:bg-[#f3f3f4] hover:text-sidebar-foreground ${focusRingClassName} motion-reduce:transition-none`}
-          >
-            <span className="flex-1">Settings</span>
-            <ChevronDown
-              aria-hidden="true"
-              className={`${iconClassName} text-[#858890]`}
-              strokeWidth={iconStrokeWidth}
-            />
-          </button>
-        )}
-
-        <nav
-          aria-label="Workspace navigation"
-          className={`${collapsed ? "" : "mt-[3px]"} flex flex-col gap-px`}
-        >
-          {workspaceItems.map((item) => (
-            <SidebarItemButton
-              key={item.label}
-              item={item}
-              collapsed={collapsed}
-              active={item.href === pathname}
-            />
-          ))}
-        </nav>
-      </div>
-
-      <div
-        className={`mt-auto pt-4 ${
-          collapsed
-            ? "flex flex-col items-center gap-2"
-            : "flex items-center justify-between"
-        }`}
-      >
-        <button
-          type="button"
-          aria-label="Help"
-          title="Help"
-          className={`inline-flex size-7 items-center justify-center rounded-full border border-[#e7e7ea] text-[#4f525a] transition-colors duration-100 ease-out hover:bg-[#f3f3f4] hover:text-sidebar-foreground ${focusRingClassName} motion-reduce:transition-none`}
-        >
-          <CircleHelp
-            aria-hidden="true"
-            className={iconClassName}
-            strokeWidth={iconStrokeWidth}
-          />
-        </button>
-        <SignOutButton collapsed={collapsed} />
-      </div>
-    </aside>
+        <SidebarNavContent />
+      </aside>
+    </>
   );
 }

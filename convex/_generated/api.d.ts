@@ -17,8 +17,6 @@ import type * as chatActions from "../chatActions.js";
 import type * as documents from "../documents.js";
 import type * as encryption from "../encryption.js";
 import type * as http from "../http.js";
-import type * as notification_client from "../notification_client.js";
-import type * as notifications from "../notifications.js";
 import type * as r2 from "../r2.js";
 import type * as submissions from "../submissions.js";
 import type * as triggerActions from "../triggerActions.js";
@@ -42,8 +40,6 @@ declare const fullApi: ApiFromModules<{
   documents: typeof documents;
   encryption: typeof encryption;
   http: typeof http;
-  notification_client: typeof notification_client;
-  notifications: typeof notifications;
   r2: typeof r2;
   submissions: typeof submissions;
   triggerActions: typeof triggerActions;
@@ -80,5 +76,4 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   agent: import("@convex-dev/agent/_generated/component.js").ComponentApi<"agent">;
-  notification: import("convex-notification/_generated/component.js").ComponentApi<"notification">;
 };
