@@ -21,7 +21,6 @@ import {
   query,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { notifications } from "./notification_client";
 
 const MAX_TITLE_PROMPT_CHARS = 2000;
 
@@ -292,7 +291,7 @@ export const listThreadMessagesPage = query({
   },
 });
 
-// Chat history for /activity — threads by recent activity.
+// Chat history — threads by recent activity.
 export const listThreads = query({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
@@ -390,30 +389,6 @@ export const recordTurnFinished = internalMutation({
       finishedAt: args.finishedAt,
       durationMs: Math.max(0, args.finishedAt - timing.startedAt),
       status: args.status,
-    });
-    if (args.status === "cancelled") return;
-
-    const activity = await ctx.db
-      .query("threadActivity")
-      .withIndex("by_thread", (q) => q.eq("threadId", timing.threadId))
-      .first();
-    if (!activity) return;
-    const title = activity.title?.trim() || "your chat";
-    const kind = args.status === "completed" ? "agent_reply" : "action_required";
-    await notifications.create(ctx, {
-      targetId: timing.userId,
-      kind,
-      data: {
-        title:
-          args.status === "completed" ? "The agent replied" : "The agent needs attention",
-        body:
-          args.status === "completed"
-            ? `There’s a new response in ${title}.`
-            : `The response in ${title} did not finish. Open the chat to retry.`,
-        href: `/agent/${timing.threadId}`,
-      },
-      source: { type: "chat", id: timing.threadId },
-      dedupeKey: `agent-turn:${args.promptMessageId}:${args.status}`,
     });
   },
 });

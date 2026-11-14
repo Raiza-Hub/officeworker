@@ -2,7 +2,6 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import { notifications } from "./notification_client";
 
 export const createDocument = mutation({
   args: {
@@ -34,17 +33,6 @@ export const setDocumentSuccess = mutation({
     if (document === null) throw new Error("Document not found");
     if (document.ownerId !== ownerId) throw new Error("Not authorized");
     await ctx.db.patch(id, { status: "Success" });
-    await notifications.create(ctx, {
-      targetId: ownerId,
-      kind: "document_ready",
-      data: {
-        title: "Document ready",
-        body: `${document.name} is ready to use in a chat.`,
-        href: "/documents",
-      },
-      source: { type: "document", id: String(id) },
-      dedupeKey: `document-ready:${id}`,
-    });
   },
 });
 
