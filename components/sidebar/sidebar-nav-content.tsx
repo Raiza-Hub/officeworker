@@ -6,7 +6,6 @@ import { useConvexAuth, useQuery } from "convex/react";
 import type { LucideIcon } from "lucide-react";
 import {
   ChevronDown,
-  CircleHelp,
   CreditCard,
   Files,
   MousePointer2,
@@ -17,7 +16,9 @@ import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { ChatHistorySection } from "@/components/chat-history/chat-history-section";
+import { useSidebar } from "@/components/sidebar/sidebar-context";
 import { SidebarLink, sidebarLinkFocusRingClassName } from "@/components/sidebar/sidebar-link";
+import { SidebarTrigger } from "@/components/sidebar/sidebar-trigger";
 
 type SidebarItem = {
   label: string;
@@ -69,6 +70,7 @@ function SidebarNavLink({
 export function SidebarNavContent() {
   const pathname = usePathname();
   const { isAuthenticated } = useConvexAuth();
+  const { isMobile } = useSidebar();
   const [settingsExpanded, setSettingsExpanded] = useState(true);
   const currentUser = useQuery(
     api.users.current,
@@ -80,7 +82,7 @@ export function SidebarNavContent() {
   const initials = getInitials(displayName);
 
   return (
-    <div className="box-border flex h-full w-[244px] shrink-0 flex-col overflow-y-auto overscroll-contain bg-sidebar-bg px-3 pt-2 pb-3 text-sidebar-text">
+    <div className="box-border flex h-full w-[244px] shrink-0 flex-col overflow-hidden bg-sidebar-bg px-3 pt-2 pb-3 text-sidebar-text">
       <div className="flex h-11 items-center gap-2">
         <button
           type="button"
@@ -105,18 +107,21 @@ export function SidebarNavContent() {
           </span>
         </button>
 
-        <button
-          type="button"
-          aria-label="Search"
-          title="Search"
-          className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#646770] transition-colors hover:bg-[#f0f0f2] hover:text-[#303137] ${focusRingClassName}`}
-        >
-          <Search
-            aria-hidden="true"
-            className={iconClassName}
-            strokeWidth={iconStrokeWidth}
-          />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            aria-label="Search"
+            title="Search"
+            className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#646770] transition-colors hover:bg-[#f0f0f2] hover:text-[#303137] ${focusRingClassName}`}
+          >
+            <Search
+              aria-hidden="true"
+              className={iconClassName}
+              strokeWidth={iconStrokeWidth}
+            />
+          </button>
+          {!isMobile && <SidebarTrigger />}
+        </div>
       </div>
 
       <nav
@@ -163,23 +168,11 @@ export function SidebarNavContent() {
         )}
       </div>
 
-      <div className="mt-3">
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <ChatHistorySection />
       </div>
 
-      <div className="mt-auto flex items-center justify-between pt-4">
-        <button
-          type="button"
-          aria-label="Help"
-          title="Help"
-          className={`inline-flex size-7 items-center justify-center rounded-full border border-[#e7e7ea] text-[#4f525a] transition-colors duration-100 ease-out hover:bg-[#f3f3f4] hover:text-sidebar-foreground ${focusRingClassName} motion-reduce:transition-none`}
-        >
-          <CircleHelp
-            aria-hidden="true"
-            className={iconClassName}
-            strokeWidth={iconStrokeWidth}
-          />
-        </button>
+      <div className="shrink-0 pt-3">
         <SignOutButton collapsed={false} />
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
-import { SidebarTrigger } from "@/components/sidebar/sidebar-trigger";
+import { HeaderSidebarTrigger } from "@/components/sidebar/sidebar-trigger";
 
 type AgentChatHeaderProps = {
   actions?: ReactNode;
@@ -16,7 +16,7 @@ export function AgentChatHeader({
   return (
     <header className="flex h-11 shrink-0 items-center justify-between border-b border-[#eeeeef] px-2">
       <div className="flex min-w-0 items-center gap-1">
-        <SidebarTrigger />
+        <HeaderSidebarTrigger />
         {showDropdown ? (
           <button
             type="button"
