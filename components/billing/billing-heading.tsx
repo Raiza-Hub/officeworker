@@ -1,10 +1,10 @@
-import { SidebarTrigger } from "@/components/sidebar/sidebar-trigger";
+import { HeaderSidebarTrigger } from "@/components/sidebar/sidebar-trigger";
 
 export function BillingHeading() {
   return (
     <header className="flex h-[60px] flex-col gap-1 px-4">
       <div className="flex h-8 items-center gap-2">
-        <SidebarTrigger />
+        <HeaderSidebarTrigger />
         <h1 className="m-0 text-[24px] leading-8 font-medium tracking-[-0.03em] text-[#24252a]">
           Billing
         </h1>
