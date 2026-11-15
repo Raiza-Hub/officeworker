@@ -39,7 +39,7 @@ export function PlanBenefits({
         <ul className="m-0 flex min-w-0 list-none flex-col p-0" key={columnIndex}>
           {column.map((benefit) => (
             <li
-              className="flex min-h-[22.5px] min-w-0 items-start gap-1.5 px-2 py-1 text-[12px] leading-[15px] font-[450] text-[#686b73]"
+              className="flex min-h-[22.5px] min-w-0 items-start gap-1.5 px-2 py-1 text-xs leading-[15px] font-[450] text-[#686b73]"
               key={benefit}
             >
               <Check

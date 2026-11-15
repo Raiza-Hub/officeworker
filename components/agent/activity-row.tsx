@@ -103,18 +103,18 @@ export function ActivityRow({
 
   return (
     <div
-      className="flex items-center gap-2 text-[13px] leading-[20px]"
+      className="flex items-center gap-2 text-[13px] leading-5"
       title={errored ? errorText || undefined : undefined}
     >
       <Icon
         aria-hidden="true"
-        className="size-4 shrink-0 text-[#85878e]"
+        className="size-4 shrink-0 text-muted-foreground"
         strokeWidth={2}
       />
-      <span className="font-mono text-[11px] text-[#85878e]">
+      <span className="font-mono text-[11px] text-muted-foreground">
         {toolName}
       </span>
-      <span className={errored ? "text-[#d64545]" : "text-[#45474e]"}>
+      <span className={errored ? "text-[#d64545]" : "text-text-secondary"}>
         {running ? <ShimmerText>{labels.active}</ShimmerText> : labels.done}
       </span>
     </div>

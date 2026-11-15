@@ -12,7 +12,7 @@ export function ChatHistoryEmptyState() {
       transition={
         reduceMotion ? { duration: 0 } : { duration: 0.2, ease: "easeOut" }
       }
-      className="px-2 py-2 text-[12px] leading-4 text-[#85878e]"
+      className="px-2 py-2 text-xs leading-4 text-muted-foreground"
     >
       No chat yet
     </m.p>

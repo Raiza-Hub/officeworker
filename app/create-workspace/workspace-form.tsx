@@ -20,7 +20,7 @@ const workspaceSchema = z.object({
 type WorkspaceFields = z.infer<typeof workspaceSchema>;
 
 const fieldClassName =
-  "h-[44px] w-[400px] max-w-full rounded-[12px] border border-[#dedfe3] bg-white px-4 text-[13px] leading-normal font-normal tracking-normal text-[#202126] outline-none transition-[border-color,box-shadow] placeholder:text-[#a0a3aa] hover:border-[#c7c9cf] focus:border-[#7279dc] focus:ring-4 focus:ring-[#7279dc]/10 disabled:cursor-not-allowed disabled:border-[#e5e6e9] disabled:bg-[#f7f7f8] disabled:text-[#81848c] disabled:opacity-100 motion-reduce:transition-none";
+  "h-11 w-100 max-w-full rounded-xl border border-[#dedfe3] bg-white px-4 text-[13px] leading-normal font-normal tracking-normal text-ink-deep outline-none transition-[border-color,box-shadow] placeholder:text-[#a0a3aa] hover:border-[#c7c9cf] focus:border-[#7279dc] focus:ring-4 focus:ring-[#7279dc]/10 disabled:cursor-not-allowed disabled:border-[#e5e6e9] disabled:bg-[#f7f7f8] disabled:text-[#81848c] disabled:opacity-100 motion-reduce:transition-none";
 
 function EyeIcon({ visible }: { visible: boolean }) {
   return (
@@ -28,7 +28,7 @@ function EyeIcon({ visible }: { visible: boolean }) {
       aria-hidden="true"
       viewBox="0 0 20 20"
       fill="none"
-      className="h-[18px] w-[18px]"
+      className="h-4.5 w-4.5"
     >
       {visible ? (
         <>
@@ -93,25 +93,25 @@ export function WorkspaceForm() {
   });
 
   return (
-    <main className="flex min-h-svh flex-1 items-center justify-center bg-app-bg px-5 py-16 text-[#202126] sm:px-8">
-      <section aria-labelledby="workspace-title" className="w-full max-w-[520px]">
+    <main className="flex min-h-svh flex-1 items-center justify-center bg-app-bg px-5 py-16 text-ink-deep sm:px-8">
+      <section aria-labelledby="workspace-title" className="w-full max-w-130">
         <header className="mb-10 text-center">
           <h1
             id="workspace-title"
-            className="m-0 text-[20px] leading-[1.2] font-medium tracking-[-0.04em] text-[#202126]"
+            className="m-0 text-xl leading-[1.2] font-medium tracking-[-0.04em] text-ink-deep"
           >
             Create a workspace
           </h1>
-          <p className="mb-0 mt-3 text-[15px] leading-[23px] font-[450] text-[#777b83]">
+          <p className="mb-0 mt-3 text-[15px] leading-[23px] font-[450] text-text-tertiary-alt">
             Move work forward across teams and agents
           </p>
         </header>
 
-        <form className="mx-auto w-[400px] max-w-full space-y-6" noValidate onSubmit={onSubmit}>
+        <form className="mx-auto w-100 max-w-full space-y-6" noValidate onSubmit={onSubmit}>
           <div>
             <label
               htmlFor="portalUrl"
-              className="mb-3 block h-[15.5px] w-[400px] max-w-full rounded-none text-[13px] leading-normal font-medium tracking-normal text-[#686b72]"
+              className="mb-3 block h-[15.5px] w-100 max-w-full rounded-none text-[13px] leading-normal font-medium tracking-normal text-text-muted-alt"
             >
               URL
             </label>
@@ -128,7 +128,7 @@ export function WorkspaceForm() {
           <div>
             <label
               htmlFor="email"
-              className="mb-3 block h-[15.5px] w-[400px] max-w-full rounded-none text-[13px] leading-normal font-medium tracking-normal text-[#686b72]"
+              className="mb-3 block h-[15.5px] w-100 max-w-full rounded-none text-[13px] leading-normal font-medium tracking-normal text-text-muted-alt"
             >
               Email
             </label>
@@ -142,7 +142,7 @@ export function WorkspaceForm() {
               className={fieldClassName}
             />
             {errors.email && (
-              <p id="email-error" role="alert" className="mb-0 mt-2 text-[13px] text-[#b42318]">
+              <p id="email-error" role="alert" className="mb-0 mt-2 text-[13px] text-danger-text">
                 {errors.email.message}
               </p>
             )}
@@ -151,7 +151,7 @@ export function WorkspaceForm() {
           <div>
             <label
               htmlFor="password"
-              className="mb-3 block h-[15.5px] w-[400px] max-w-full rounded-none text-[13px] leading-normal font-medium tracking-normal text-[#686b72]"
+              className="mb-3 block h-[15.5px] w-100 max-w-full rounded-none text-[13px] leading-normal font-medium tracking-normal text-text-muted-alt"
             >
               Password
             </label>
@@ -170,13 +170,13 @@ export function WorkspaceForm() {
                 onClick={() => setPasswordVisible((visible) => !visible)}
                 aria-label={passwordVisible ? "Hide password" : "Show password"}
                 aria-pressed={passwordVisible}
-                className="absolute top-1/2 right-2.5 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg bg-transparent text-[#858990] transition-colors hover:text-[#45474e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7279dc] motion-reduce:transition-none"
+                className="absolute top-1/2 right-2.5 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg bg-transparent text-[#858990] transition-colors hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7279dc] motion-reduce:transition-none"
               >
                 <EyeIcon visible={passwordVisible} />
               </button>
             </div>
             {errors.password && (
-              <p id="password-error" role="alert" className="mb-0 mt-2 text-[13px] text-[#b42318]">
+              <p id="password-error" role="alert" className="mb-0 mt-2 text-[13px] text-danger-text">
                 {errors.password.message}
               </p>
             )}
@@ -185,13 +185,13 @@ export function WorkspaceForm() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-5 inline-flex h-[44px] w-full items-center justify-center rounded-full bg-[#202126] px-5 text-[13px] leading-normal font-medium tracking-normal text-white transition-[background-color,transform] duration-150 hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#202126] focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70 active:scale-[0.99] motion-reduce:transition-none"
+            className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-full bg-ink-deep px-5 text-[13px] leading-normal font-medium tracking-normal text-white transition-[background-color,transform] duration-150 hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#202126] focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70 active:scale-99 motion-reduce:transition-none"
           >
             Create workspace
           </button>
 
           {serverError && (
-            <p role="alert" className="m-0 text-center text-[13px] text-[#b42318]">
+            <p role="alert" className="m-0 text-center text-[13px] text-danger-text">
               {serverError}
             </p>
           )}

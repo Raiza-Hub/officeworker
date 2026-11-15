@@ -79,7 +79,7 @@ export function ChatHistoryList() {
         >
           <LoaderCircle
             aria-label="Loading more chats"
-            className="size-4 animate-spin text-[#85878e]"
+            className="size-4 animate-spin text-muted-foreground"
             strokeWidth={2}
           />
         </m.div>

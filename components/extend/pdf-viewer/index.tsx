@@ -1090,7 +1090,7 @@ function PDFViewerToolbar({
             >
               <SelectTrigger
                 size="sm"
-                className="w-[104px] min-w-[104px]"
+                className="w-26 min-w-26"
                 aria-label="Zoom level"
               >
                 <SelectValue placeholder="Zoom">

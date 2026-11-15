@@ -128,7 +128,7 @@ export function UploadDocumentsButton({
         aria-busy={isUploading}
         className={
           className ??
-          "inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] leading-4 font-medium text-[#5c5f67] transition-colors hover:bg-[#f0f0f2] hover:text-[#292a30] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6069d9]/40 disabled:pointer-events-none disabled:opacity-60"
+          "inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] leading-4 font-medium text-[#5c5f67] transition-colors hover:bg-surface-hover-soft hover:text-ink-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring/40 disabled:pointer-events-none disabled:opacity-60"
         }
       >
         {icon === "plus" ? (

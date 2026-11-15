@@ -53,9 +53,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               className="min-h-svh flex-1 animate-pulse bg-app-bg"
             >
               <div className="mx-auto flex h-full max-w-6xl flex-col gap-6 px-4 pt-20 sm:px-6">
-                <div className="h-8 w-48 rounded-lg bg-[#e5e5e7]" />
+                <div className="h-8 w-48 rounded-lg bg-border-muted" />
                 <div className="h-4 w-80 rounded bg-[#ededef]" />
-                <div className="mt-4 h-64 rounded-xl bg-[#f3f3f4]" />
+                <div className="mt-4 h-64 rounded-xl bg-secondary" />
               </div>
             </div>
           }

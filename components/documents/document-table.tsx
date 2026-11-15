@@ -53,7 +53,7 @@ export function DocumentTable({ searchTerm }: { searchTerm: string }) {
   }, [loadMore, status]);
 
   return (
-    <div className="-mx-[18px] mt-5 w-[calc(100%+36px)] overflow-hidden text-[#24252a]">
+    <div className="-mx-4.5 mt-5 w-[calc(100%+36px)] overflow-hidden text-ink">
       <DocumentTableHeader columnsClassName={documentTableColumns} />
 
       {status === "LoadingFirstPage" ? (
@@ -68,16 +68,16 @@ export function DocumentTable({ searchTerm }: { searchTerm: string }) {
               <div
                 key={doc._id}
                 role="row"
-                className={`group grid h-11 items-center ${documentTableColumns} pl-[60px] pr-8 text-[12px] leading-4 text-[#3f4148] transition-colors hover:bg-[#f7f7f8]`}
+                className={`group grid h-11 items-center ${documentTableColumns} pl-15 pr-8 text-xs leading-4 text-[#3f4148] transition-colors hover:bg-[#f7f7f8]`}
               >
                 <div className="flex min-w-0 items-center gap-2">
-                  <span aria-hidden="true" className="flex size-[18px] shrink-0 items-center justify-center">
+                  <span aria-hidden="true" className="flex size-4.5 shrink-0 items-center justify-center">
                     <svg viewBox="0 0 14 14" className="size-3.5" fill="none">
                       <rect x="1.5" y="3" width="11" height="8" rx="1.5" fill="#5f7cf0" />
                       <path d="M3.75 6.25h6.5M3.75 8.5h6.5" stroke="white" strokeWidth="1" strokeLinecap="round" />
                     </svg>
                   </span>
-                  <span className="truncate text-[13px] font-medium text-[#292a30]">{doc.name}</span>
+                  <span className="truncate text-[13px] font-medium text-ink-soft">{doc.name}</span>
                 </div>
                 <span className={`font-medium${isUploading ? " animate-pulse text-[#a0a2a8]" : ""}`}>
                   {isUploading ? "Uploading…" : "Success"}
@@ -88,7 +88,7 @@ export function DocumentTable({ searchTerm }: { searchTerm: string }) {
                 <button
                   type="button"
                   aria-label={isUploading ? "Upload in progress" : "More document actions"}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#656870] opacity-0 transition-[background-color,opacity] group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[#f1f1f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/30"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-text-dim opacity-0 transition-[background-color,opacity] group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[#f1f1f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                 >
                   <MoreHorizontal aria-hidden="true" className="size-4" strokeWidth={2.5} />
                 </button>
@@ -98,7 +98,7 @@ export function DocumentTable({ searchTerm }: { searchTerm: string }) {
 
           {results.length === 0 ? (
             shownTerm.trim().length > 0 ? (
-              <div className="mx-2 mt-3 rounded-[9px] border border-dashed border-[#dedee3] px-[52px] py-6 text-[12px] font-medium text-[#656870]">
+              <div className="mx-2 mt-3 rounded-[9px] border border-dashed border-[#dedee3] px-13 py-6 text-xs font-medium text-text-dim">
                 No documents match &quot;{shownTerm.trim()}&quot;
               </div>
             ) : (
@@ -107,7 +107,7 @@ export function DocumentTable({ searchTerm }: { searchTerm: string }) {
           ) : null}
 
           {status === "LoadingMore" ? (
-            <div className="mx-2 flex h-9 items-center px-[52px] text-[12px] font-medium text-[#a0a2a8]">
+            <div className="mx-2 flex h-9 items-center px-13 text-xs font-medium text-[#a0a2a8]">
               Loading…
             </div>
           ) : null}

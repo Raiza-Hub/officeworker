@@ -49,12 +49,12 @@ type PreviewToolbarProps = {
 };
 
 const iconButtonClass =
-  "inline-flex size-7 items-center justify-center rounded-full text-[#5f6368] transition-colors hover:bg-[#f1f3f4] hover:text-[#202124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/50 disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex size-7 items-center justify-center rounded-full text-text-dim-soft transition-colors hover:bg-[#f1f3f4] hover:text-[#202124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-40";
 
 const zoomGroupClass = "mr-1 flex items-center gap-0.5 border-r border-[#eeeeef] pr-2";
 
 const zoomValueClass =
-  "min-w-[2.5rem] text-center text-[12px] tabular-nums text-[#5f6368]";
+  "min-w-[2.5rem] text-center text-xs tabular-nums text-text-dim-soft";
 
 function stepCsvZoom(
   csvZoom: number,
@@ -109,7 +109,7 @@ export function PreviewToolbar({
       className="z-10 flex h-11 min-h-11 shrink-0 items-center justify-between gap-3 border-b border-[#eeeeef] bg-white px-3 sm:px-4 print:hidden"
     >
       <div className="flex min-w-0 items-center">
-        <span className="truncate text-[13px] font-medium text-[#292a30]">
+        <span className="truncate text-[13px] font-medium text-ink-soft">
           {filename}
         </span>
       </div>

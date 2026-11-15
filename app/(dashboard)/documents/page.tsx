@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function DocumentsPage() {
   return (
-    <div className="flex h-full min-h-0 flex-col bg-agent-page-bg text-[#24252a]">
+    <div className="flex h-full min-h-0 flex-col bg-agent-page-bg text-ink">
       <AgentChatHeader
         title="Documents"
         showDropdown={false}

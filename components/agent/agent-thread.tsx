@@ -40,10 +40,10 @@ export function LiveLine({
 }) {
   const elapsed = useElapsed(startedAt, showElapsed);
   return (
-    <div className="flex items-center gap-1.5 text-[12px] leading-none">
+    <div className="flex items-center gap-1.5 text-xs leading-none">
       <Loader
         aria-hidden="true"
-        className="size-3.5 animate-spin text-[#85878e] [animation-duration:0.7s]"
+        className="size-3.5 animate-spin text-muted-foreground [animation-duration:0.7s]"
         strokeWidth={2}
       />
       <ShimmerText>Thinking…</ShimmerText>
@@ -61,7 +61,7 @@ export function ThreadLoading() {
     <div className="flex min-h-0 flex-1 flex-col justify-start px-6 pt-6">
       <p
         role="status"
-        className="mx-auto mt-0 mb-0 flex w-full max-w-[712px] items-center justify-start gap-1.5 text-left text-[13px] text-[#85878e]"
+        className="mx-auto mt-0 mb-0 flex w-full max-w-178 items-center justify-start gap-1.5 text-left text-[13px] text-muted-foreground"
       >
         <Loader
           aria-hidden="true"
@@ -211,7 +211,7 @@ export function AgentThread({ threadId }: { threadId: string }) {
       <StickToBottom className="min-h-0 flex-1" resize="smooth" initial="instant">
         <StickToBottom.Content
           scrollClassName="overflow-y-auto px-6 py-6"
-          className="mx-auto flex min-h-full w-full max-w-[712px] flex-col gap-6"
+          className="mx-auto flex min-h-full w-full max-w-178 flex-col gap-6"
         >
           {displayedResults.map((message) => {
             const isUser = message.role === "user";
@@ -257,7 +257,7 @@ export function AgentThread({ threadId }: { threadId: string }) {
 
             return (
               <div key={message.id} className="flex w-full flex-col gap-4 items-end">
-                <div className="max-w-[80%] rounded-[14px] rounded-br-[4px] bg-[#626bd9] px-3.5 py-2.5 text-[14px] leading-[22px] text-white">
+                <div className="max-w-[80%] rounded-[14px] rounded-br-sm bg-primary px-3.5 py-2.5 text-sm leading-5.5 text-white">
                   <p className="m-0 whitespace-pre-wrap">{parts.map(partText).join("")}</p>
                   <UserAttachments attachments={attachments} onPreview={setPreviewAttachment} />
                 </div>

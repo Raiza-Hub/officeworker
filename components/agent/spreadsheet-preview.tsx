@@ -86,7 +86,7 @@ function SheetPreview({
         showDefaultToolbar={false}
         loadingState={<PreviewLoading />}
         errorState={(error) => (
-          <div role="alert" className="flex h-full min-h-[300px] w-full items-center justify-center px-6 text-center text-[13px] text-[#85878e]">
+          <div role="alert" className="flex h-full min-h-75 w-full items-center justify-center px-6 text-center text-[13px] text-muted-foreground">
             {error.message || "Could not display this spreadsheet"}
           </div>
         )}
@@ -145,7 +145,7 @@ function CsvPreview({
 
   if (loadError) {
     return (
-      <div className="flex h-full min-h-[300px] w-full items-center justify-center text-[13px] text-[#85878e]">
+      <div className="flex h-full min-h-75 w-full items-center justify-center text-[13px] text-muted-foreground">
         <span>{loadError}</span>
       </div>
     );
@@ -241,7 +241,7 @@ export function SpreadsheetPreview({
 
   if (loadError) {
     return (
-      <div className="flex h-full min-h-[300px] w-full items-center justify-center text-[13px] text-[#85878e]">
+      <div className="flex h-full min-h-75 w-full items-center justify-center text-[13px] text-muted-foreground">
         <span>{loadError}</span>
       </div>
     );

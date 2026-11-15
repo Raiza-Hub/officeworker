@@ -6,7 +6,7 @@ export default function LoginPage() {
     <main className="flex min-h-svh flex-1 items-center justify-center bg-app-bg px-6 py-12">
       <section
         aria-labelledby="login-title"
-        className="w-full max-w-[376px] text-center"
+        className="w-full max-w-94 text-center"
       >
         <Image
           src="/officeworker-mark.png"
@@ -19,12 +19,12 @@ export default function LoginPage() {
 
         <h1
           id="login-title"
-          className="mx-auto mt-8 h-[22px] w-[288px] max-w-full text-[18px] leading-normal font-medium tracking-[-0.025em] text-[#191a1d]"
+          className="mx-auto mt-8 h-5.5 w-72 max-w-full text-lg leading-normal font-medium tracking-[-0.025em] text-[#191a1d]"
         >
           Create your workspace
         </h1>
 
-        <p className="mx-auto mt-2 w-[288px] max-w-full text-[13px] leading-[19.5px] text-[#777981]">
+        <p className="mx-auto mt-2 w-72 max-w-full text-[13px] leading-[19.5px] text-[#777981]">
           Sign in or create an account to continue.
         </p>
 
@@ -32,13 +32,13 @@ export default function LoginPage() {
           <GoogleSignInButton />
         </div>
 
-        <p className="mx-auto mt-12 h-[58.5px] w-[288px] max-w-full text-[13px] leading-[19.5px] font-[450] tracking-normal text-[#777981]">
+        <p className="mx-auto mt-12 h-[58.5px] w-72 max-w-full text-[13px] leading-[19.5px] font-[450] tracking-normal text-[#777981]">
           By continuing, you agree to our
           <br />
-          <span className="text-[#45474e]">Terms of Service</span>,{" "}
-          <span className="text-[#45474e]">Privacy Policy</span>,
+          <span className="text-text-secondary">Terms of Service</span>,{" "}
+          <span className="text-text-secondary">Privacy Policy</span>,
           <br />
-          and <span className="text-[#45474e]">Data Processing Agreement</span>.
+          and <span className="text-text-secondary">Data Processing Agreement</span>.
         </p>
       </section>
     </main>

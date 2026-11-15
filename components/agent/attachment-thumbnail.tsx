@@ -93,7 +93,7 @@ export function AttachmentThumbnail({
       />
       <span
         title={attachment.name}
-        className={`mt-1 block w-full truncate text-left text-[11px] leading-4 ${inverse ? "text-white" : "text-[#45474e]"}`}
+        className={`mt-1 block w-full truncate text-left text-[11px] leading-4 ${inverse ? "text-white" : "text-text-secondary"}`}
       >
         {attachment.name}
       </span>
@@ -101,7 +101,7 @@ export function AttachmentThumbnail({
   );
 
   return (
-    <div className="group/attachment relative w-[112px] shrink-0">
+    <div className="group/attachment relative w-28 shrink-0">
       {canPreview ? (
         <button
           type="button"
@@ -109,7 +109,7 @@ export function AttachmentThumbnail({
           title={attachment.name}
           aria-busy={isUploading || Boolean(attachment.key && !fileUrl && !sourceError)}
           onClick={onPreview}
-          className="block w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/50"
+          className="block w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         >
           {preview}
         </button>
@@ -125,7 +125,7 @@ export function AttachmentThumbnail({
                 "This file format can't be displayed in the browser. Download it to view the contents.",
             })
           }
-          className="block w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/50"
+          className="block w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         >
           {preview}
         </button>
@@ -142,7 +142,7 @@ export function AttachmentThumbnail({
         <span
           role="status"
           aria-label={`Uploading ${attachment.name}`}
-          className="absolute top-1 right-1 inline-flex size-5 items-center justify-center rounded-full bg-white/90 text-[#626bd9] shadow-sm"
+          className="absolute top-1 right-1 inline-flex size-5 items-center justify-center rounded-full bg-white/90 text-primary shadow-sm"
         >
           <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" />
         </span>
@@ -152,7 +152,7 @@ export function AttachmentThumbnail({
           type="button"
           aria-label={`Remove ${attachment.name}`}
           onClick={onRemove}
-          className="absolute -top-1.5 -right-1.5 inline-flex size-5 items-center justify-center rounded-full border border-white bg-[#45474e] text-white shadow-sm transition-opacity hover:bg-[#303137] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/50 sm:opacity-0 sm:group-hover/attachment:opacity-100 sm:focus-visible:opacity-100"
+          className="absolute -top-1.5 -right-1.5 inline-flex size-5 items-center justify-center rounded-full border border-white bg-text-secondary text-white shadow-sm transition-opacity hover:bg-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 sm:opacity-0 sm:group-hover/attachment:opacity-100 sm:focus-visible:opacity-100"
         >
           <X aria-hidden="true" className="size-3" strokeWidth={2.2} />
         </button>

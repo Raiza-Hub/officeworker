@@ -45,7 +45,7 @@ export function ChatHistoryRenameForm({
         aria-label="Chat name"
         onChange={(event) => onChange(event.target.value)}
         onBlur={onSave}
-        className="h-7 min-w-0 flex-1 rounded-[7px] border-[0.5px] border-[lch(86%_0_282)] bg-white px-2 text-[13px] leading-normal font-medium text-[#292a30] placeholder:text-[#a6a7ad] shadow-[inset_0_1px_2px_lch(0_0_0/0.05)] outline-none transition-[border-color,box-shadow] focus:border-[#626bd9] focus:ring-2 focus:ring-[#626bd9]/20"
+        className="h-7 min-w-0 flex-1 rounded-[7px] border-[0.5px] border-[lch(86%_0_282)] bg-white px-2 text-[13px] leading-normal font-medium text-ink-soft placeholder:text-[#a6a7ad] shadow-[inset_0_1px_2px_lch(0_0_0/0.05)] outline-none transition-[border-color,box-shadow] focus:border-primary focus:ring-2 focus:ring-primary/20"
       />
     </form>
   );

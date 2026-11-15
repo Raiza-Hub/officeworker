@@ -5,10 +5,10 @@ const gridCells = Array.from({ length: 32 }, (_, index) => index);
 function SlackMark() {
   return (
     <span aria-hidden="true" className="relative block size-9">
-      <span className="absolute left-[15px] top-0 h-[14px] w-[7px] rounded-full bg-[#36c5f0]" />
-      <span className="absolute left-0 top-[15px] h-[7px] w-[14px] rounded-full bg-[#2eb67d]" />
-      <span className="absolute bottom-0 right-[15px] h-[14px] w-[7px] rounded-full bg-[#e01e5a]" />
-      <span className="absolute bottom-[15px] right-0 h-[7px] w-[14px] rounded-full bg-[#ecb22e]" />
+      <span className="absolute left-[15px] top-0 h-3.5 w-[7px] rounded-full bg-[#36c5f0]" />
+      <span className="absolute left-0 top-[15px] h-[7px] w-3.5 rounded-full bg-[#2eb67d]" />
+      <span className="absolute bottom-0 right-[15px] h-3.5 w-[7px] rounded-full bg-[#e01e5a]" />
+      <span className="absolute bottom-[15px] right-0 h-[7px] w-3.5 rounded-full bg-[#ecb22e]" />
       <span className="absolute left-[15px] top-[15px] h-[7px] w-[7px] rounded-full bg-[#36c5f0]" />
       <span className="absolute bottom-[15px] left-[15px] h-[7px] w-[7px] rounded-full bg-[#2eb67d]" />
       <span className="absolute bottom-[15px] right-[15px] h-[7px] w-[7px] rounded-full bg-[#e01e5a]" />
@@ -48,18 +48,18 @@ function NotionMark() {
 
 export function DocumentEmptyState() {
   return (
-    <div className="flex min-h-[500px] w-full items-center justify-center overflow-hidden px-4">
-      <div className="-translate-y-2 flex w-full max-w-[680px] flex-col items-center text-center">
+    <div className="flex min-h-125 w-full items-center justify-center overflow-hidden px-4">
+      <div className="-translate-y-2 flex w-full max-w-170 flex-col items-center text-center">
         <div
           aria-label="Knowledge base image grid"
-          className="relative aspect-[2/1] w-[min(360px,82vw)]"
+          className="relative aspect-2/1 w-[min(360px,82vw)]"
         >
-          <div className="absolute inset-0 grid grid-cols-8 grid-rows-4 border-r border-b border-[#e5e5e7]">
+          <div className="absolute inset-0 grid grid-cols-8 grid-rows-4 border-r border-b border-border-muted">
             {gridCells.map((cell) => (
               <span
                 key={cell}
                 aria-hidden="true"
-                className="border-l border-t border-[#e5e5e7]"
+                className="border-l border-t border-border-muted"
               />
             ))}
           </div>
@@ -87,10 +87,10 @@ export function DocumentEmptyState() {
           </div>
         </div>
 
-        <h1 className="mt-6 text-[20px] leading-6 font-medium tracking-[-0.03em] text-[#15161a]">
+        <h1 className="mt-6 text-xl leading-6 font-medium tracking-[-0.03em] text-[#15161a]">
           It’s empty here
         </h1>
-        <p className="mt-1 text-[13px] leading-[22px] font-[450] text-[#999a9e]">
+        <p className="mt-1 text-[13px] leading-5.5 font-[450] text-[#999a9e]">
           Add knowledge base now
         </p>
         <UploadDocumentsButton

@@ -19,7 +19,7 @@ import { BLOCKED_MEDIA_MESSAGE, isBlockedMediaFile } from "@/lib/blocked-media";
 import { AttachmentThumbnail } from "@/components/agent/attachment-thumbnail";
 import { PreviewModal } from "@/components/agent/preview-modal";
 
-const MIN_TEXTAREA_HEIGHT = 54;
+const MIN_TEXTAREA_HEIGHT = 60;
 const MAX_COMPOSER_HEIGHT = 240;
 
 type PendingAttachment = {
@@ -146,7 +146,7 @@ function ComposerSendButton({
       aria-label={isGenerating ? "Stop generation" : "Send message"}
       onClick={isGenerating ? onStop : undefined}
       disabled={isGenerating ? isStopping : !canSend}
-      className="inline-flex size-7 items-center justify-center rounded-full bg-[#626bd9] text-white transition-[background-color,transform] duration-100 hover:bg-[#555fc9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/40 focus-visible:ring-offset-2 active:scale-95 disabled:bg-[#c9cae4] disabled:text-white/80"
+      className="inline-flex size-7 items-center justify-center rounded-full bg-primary text-white transition-[background-color,transform] duration-100 hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 active:scale-95 disabled:bg-[#c9cae4] disabled:text-white/80"
     >
       {isGenerating ? (
         <Square aria-hidden="true" className="size-3.5" fill="currentColor" strokeWidth={1.5} />
@@ -235,7 +235,7 @@ export function AgentComposer({
       }}
       className="relative z-10 w-full"
     >
-      <div className="flex min-h-[104px] flex-col rounded-[11px] border border-[#e7e7e9] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.035)] transition-[border-color,box-shadow] focus-within:border-[#d9dae0] focus-within:shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+      <div className="flex min-h-28.5 flex-col rounded-[11px] border border-border bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.035)] transition-[border-color,box-shadow] focus-within:border-[#d9dae0] focus-within:shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
         <ComposerAttachmentList
           attachments={attachments}
           pendingAttachments={pendingAttachments}
@@ -249,7 +249,7 @@ export function AgentComposer({
         <textarea
           ref={textareaRef}
           aria-label="Message the assistant"
-          placeholder="Ask Officeworker…"
+          placeholder="Ask me anything..."
           rows={1}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -259,8 +259,7 @@ export function AgentComposer({
               if (canSend) onSubmit();
             }
           }}
-          className="w-full shrink-0 resize-none bg-transparent text-[15px] leading-6 text-[#25262b] outline-none placeholder:text-[#85878e]"
-          style={{ minHeight: MIN_TEXTAREA_HEIGHT }}
+          className="min-h-15 w-full shrink-0 resize-none bg-transparent text-[15px] leading-6 text-[#25262b] outline-none placeholder:text-muted-foreground"
         />
         <div className="mt-auto flex h-6 shrink-0 items-center justify-between">
           {onAttachmentsChange ? (
@@ -269,7 +268,7 @@ export function AgentComposer({
               aria-label="Attach a file"
               onClick={selectFiles}
               disabled={isSubmitting || loading}
-              className="inline-flex size-7 items-center justify-center rounded-full text-[#71747c] transition-colors hover:bg-[#f3f3f4] hover:text-[#303137] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/35 disabled:opacity-50"
+              className="inline-flex size-7 items-center justify-center rounded-full text-[#71747c] transition-colors hover:bg-secondary hover:text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 disabled:opacity-50"
             >
               <Paperclip aria-hidden="true" className="size-3.5" strokeWidth={2} />
             </button>

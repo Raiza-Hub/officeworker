@@ -100,7 +100,7 @@ export function AgentThreadFrame({
     <ThreadTitleContext.Provider value={titleContextValue}>
       <MessagesStatusContext.Provider value={messagesStatusContextValue}>
         <ComposerPrefillContext.Provider value={composerPrefillContextValue}>
-          <div className="flex h-full min-h-0 flex-col bg-agent-page-bg text-[#24252a]">
+          <div className="flex h-full min-h-0 flex-col bg-agent-page-bg text-ink">
             <AgentChatHeader
               title={preloadedTitle ?? "New chat"}
               showDropdown={false}
@@ -109,7 +109,7 @@ export function AgentThreadFrame({
               {children}
             </div>
             <div className="shrink-0 px-6 pb-5">
-              <div className="mx-auto w-full max-w-[712px]">
+              <div className="mx-auto w-full max-w-178">
                 <AgentComposer
                   value={prompt}
                   onChange={setPrompt}

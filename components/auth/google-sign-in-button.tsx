@@ -26,7 +26,7 @@ export function GoogleSignInButton() {
         type="button"
         onClick={handleSignIn}
         disabled={isPending}
-        className="mx-auto inline-flex h-[44px] w-[288px] max-w-full items-center justify-center rounded-full bg-[#6069d9] px-4 text-[13px] leading-normal font-medium text-white transition-[background-color,transform] duration-150 hover:bg-[#535dcd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6069d9] focus-visible:ring-offset-2 active:scale-[0.99] disabled:cursor-wait disabled:opacity-70 motion-reduce:transition-none"
+        className="mx-auto inline-flex h-11 w-72 max-w-full items-center justify-center rounded-full bg-primary-ring px-4 text-[13px] leading-normal font-medium text-white transition-[background-color,transform] duration-150 hover:bg-[#535dcd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring focus-visible:ring-offset-2 active:scale-99 disabled:cursor-wait disabled:opacity-70 motion-reduce:transition-none"
       >
         {isPending ? "Connecting…" : "Continue with Google"}
       </button>
