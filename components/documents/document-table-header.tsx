@@ -6,7 +6,7 @@ export function DocumentTableHeader({ columnsClassName }: { columnsClassName: st
   return (
     <div
       role="row"
-      className={`grid h-8 items-center ${columnsClassName} pl-[60px] pr-8 text-[12px] leading-4 font-[450] text-[#656870]`}
+      className={`grid h-8 items-center ${columnsClassName} pl-15 pr-8 text-xs leading-4 font-[450] text-text-dim`}
     >
       <span>{headers[0]}</span>
       <span className="inline-flex items-center gap-1">

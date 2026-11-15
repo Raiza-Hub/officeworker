@@ -18,9 +18,9 @@ export function GenericFileThumbnail({
       previewContent={
         <div className="flex size-full flex-col gap-2 bg-white p-3">
           <div className="h-2 w-2/3 rounded-sm bg-[#e4e5e9]" />
-          <div className="h-1.5 w-full rounded-sm bg-[#ececf0]" />
-          <div className="h-1.5 w-5/6 rounded-sm bg-[#ececf0]" />
-          <div className="h-1.5 w-3/4 rounded-sm bg-[#ececf0]" />
+          <div className="h-1.5 w-full rounded-sm bg-muted" />
+          <div className="h-1.5 w-5/6 rounded-sm bg-muted" />
+          <div className="h-1.5 w-3/4 rounded-sm bg-muted" />
           <div className="mt-1 grid flex-1 grid-cols-3 grid-rows-3 gap-px overflow-hidden rounded-sm border border-[#e5e6ea] bg-[#e5e6ea]">
             {Array.from({ length: 9 }, (_, index) => (
               <span

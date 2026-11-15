@@ -8,13 +8,11 @@ import { api } from "@/convex/_generated/api";
 import { AgentChatHeader } from "@/components/agent/agent-chat-header";
 import { AgentComposer } from "@/components/agent/agent-composer";
 import { type ChatAttachment } from "@/lib/attachments";
-import { AgentExamples } from "@/components/agent/agent-examples";
 import { usePendingReply } from "@/components/agent/pending-reply-context";
 
 export function AgentWorkspace() {
   const [prompt, setPrompt] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
-  const [showExamples, setShowExamples] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const startThread = useMutation(api.chat.startThread);
@@ -53,10 +51,13 @@ export function AgentWorkspace() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-agent-page-bg text-[#24252a]">
+    <div className="flex h-full min-h-0 flex-col bg-agent-page-bg text-ink">
       <AgentChatHeader showDropdown={false} />
-      <div className="relative min-h-0 flex-1 overflow-auto p-6">
-        <div className="relative z-10 mx-auto w-full max-w-[712px] pt-[calc(50svh-180px)] max-[700px]:pt-24">
+      <div className="flex min-h-0 flex-1 justify-center overflow-auto p-6">
+        <div className="relative z-10 my-auto w-full max-w-178">
+          <h1 className="mb-8 text-center text-3xl leading-none font-normal tracking-[-0.01em] text-ink">
+            What do you need help with today?
+          </h1>
           <AgentComposer
             value={prompt}
             onChange={setPrompt}
@@ -79,12 +80,6 @@ export function AgentWorkspace() {
                 Add credits
               </button>
             </div>
-          )}
-          {showExamples && (
-            <AgentExamples
-              onSelect={setPrompt}
-              onDismiss={() => setShowExamples(false)}
-            />
           )}
         </div>
       </div>

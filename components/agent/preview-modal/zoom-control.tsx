@@ -3,7 +3,7 @@
 import { CircleMinus, CirclePlusIcon, Maximize } from "lucide-react";
 
 const iconButtonClass =
-  "inline-flex size-7 items-center justify-center rounded-full text-[#5f6368] transition-colors hover:bg-[#f1f3f4] hover:text-[#202124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/50 disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex size-7 items-center justify-center rounded-full text-text-dim-soft transition-colors hover:bg-[#f1f3f4] hover:text-[#202124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-40";
 
 export function ZoomControl({
   zoom,
@@ -34,7 +34,7 @@ export function ZoomControl({
       >
         <CircleMinus aria-hidden="true" className="size-3.5 shrink-0" />
       </button>
-      <span className="min-w-[2.5rem] text-center text-[12px] tabular-nums text-[#5f6368]">
+      <span className="min-w-[2.5rem] text-center text-xs tabular-nums text-text-dim-soft">
         {Math.round(zoom * 100)}%
       </span>
       <button

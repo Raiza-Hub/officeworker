@@ -15,7 +15,7 @@ export function ChatHistorySection() {
         type="button"
         aria-expanded={isExpanded}
         onClick={() => setIsExpanded((v) => !v)}
-        className="flex h-7 w-full items-center gap-1 rounded-lg px-[5px] text-left text-[12px] leading-[14px] font-medium text-[#62656d] transition-colors duration-100 ease-out hover:bg-[#f3f3f4] hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6069d9]/40 motion-reduce:transition-none"
+        className="flex h-7 w-full items-center gap-1 rounded-lg px-[5px] text-left text-xs leading-3.5 font-medium text-[#62656d] transition-colors duration-100 ease-out hover:bg-secondary hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring/40 motion-reduce:transition-none"
       >
         <span className="flex-1">Chat history</span>
         <ChevronDown

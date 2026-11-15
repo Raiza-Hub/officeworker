@@ -16,14 +16,14 @@ function ProfilePictureRow({
   initials: string;
 }) {
   return (
-    <li className={`${profileRowDividerClassName} flex h-[66px] items-center justify-between px-4`}>
-      <span className="text-[13px] leading-none font-medium text-[#292a30]">
+    <li className={`${profileRowDividerClassName} flex h-16.5 items-center justify-between px-4`}>
+      <span className="text-[13px] leading-none font-medium text-ink-soft">
         Profile picture
       </span>
       <button
         type="button"
         aria-label="Change profile picture"
-        className="inline-flex size-8 items-center justify-center overflow-hidden rounded-full bg-[#00c3a1] text-[15px] leading-none font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/40 focus-visible:ring-offset-2"
+        className="inline-flex size-8 items-center justify-center overflow-hidden rounded-full bg-[#00c3a1] text-[15px] leading-none font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
       >
         {image ? (
           <Image
@@ -43,11 +43,11 @@ function ProfilePictureRow({
 
 function EmailRow({ email }: { email: string }) {
   return (
-    <li className={`${profileRowDividerClassName} flex h-[60px] items-center justify-between gap-3 px-4`}>
-      <span className="text-[13px] leading-none font-medium text-[#292a30]">
+    <li className={`${profileRowDividerClassName} flex h-15 items-center justify-between gap-3 px-4`}>
+      <span className="text-[13px] leading-none font-medium text-ink-soft">
         Email
       </span>
-      <span className="truncate text-[13px] leading-none text-[#303137]">
+      <span className="truncate text-[13px] leading-none text-secondary-foreground">
         {email}
       </span>
     </li>
@@ -56,11 +56,11 @@ function EmailRow({ email }: { email: string }) {
 
 function FullNameRow({ fullName }: { fullName: string }) {
   return (
-    <li className={`${profileRowDividerClassName} flex h-[64px] items-center justify-between gap-4 px-4`}>
-      <span className="text-[13px] leading-none font-medium text-[#292a30]">
+    <li className={`${profileRowDividerClassName} flex h-16 items-center justify-between gap-4 px-4`}>
+      <span className="text-[13px] leading-none font-medium text-ink-soft">
         Full name
       </span>
-      <span className="truncate text-[13px] leading-none text-[#303137]">
+      <span className="truncate text-[13px] leading-none text-secondary-foreground">
         {fullName}
       </span>
     </li>

@@ -27,12 +27,12 @@ export function SignOutButton({ collapsed }: { collapsed: boolean }) {
       disabled={isPending}
       aria-label="Sign out"
       title="Sign out"
-      className={`inline-flex h-7 items-center rounded-full text-[#4f525a] transition-colors duration-100 ease-out hover:bg-[#f3f3f4] hover:text-sidebar-foreground disabled:cursor-wait disabled:opacity-60 ${
+      className={`inline-flex h-7 items-center rounded-full text-[#4f525a] transition-colors duration-100 ease-out hover:bg-secondary hover:text-sidebar-foreground disabled:cursor-wait disabled:opacity-60 ${
         collapsed ? "w-7 justify-center" : "gap-1.5 px-2"
-      } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6069d9]/40 motion-reduce:transition-none`}
+      } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring/40 motion-reduce:transition-none`}
     >
       <LogOut aria-hidden="true" className="size-3.5" strokeWidth={2.25} />
-      {!collapsed && <span className="text-[12px] font-medium">Sign out</span>}
+      {!collapsed && <span className="text-xs font-medium">Sign out</span>}
     </button>
   );
 }

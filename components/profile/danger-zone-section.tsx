@@ -3,16 +3,16 @@ export function DangerZoneSection() {
     <section aria-labelledby="danger-zone-heading" className="mt-9 pt-3">
       <h2
         id="danger-zone-heading"
-        className="m-0 h-[23px] px-4 text-[15px] leading-[23px] font-medium text-[#292a30]"
+        className="m-0 h-[23px] px-4 text-[15px] leading-[23px] font-medium text-ink-soft"
       >
         Danger zone
       </h2>
-      <div className="mt-4 flex min-h-[72px] items-center justify-between gap-4 rounded-[10px] bg-white px-4 py-3 shadow-[0_0_0_0.5px_rgba(0,0,0,0.09),0_3px_6px_-2px_rgba(0,0,0,0.02),0_1px_1px_rgba(0,0,0,0.04)]">
+      <div className="mt-4 flex min-h-18 items-center justify-between gap-4 rounded-[10px] bg-white px-4 py-3 shadow-[0_0_0_0.5px_rgba(0,0,0,0.09),0_3px_6px_-2px_rgba(0,0,0,0.02),0_1px_1px_rgba(0,0,0,0.04)]">
         <div className="flex min-w-0 flex-col gap-1">
-          <span className="text-[13px] leading-4 font-medium text-[#292a30]">
+          <span className="text-[13px] leading-4 font-medium text-ink-soft">
             Delete Account
           </span>
-          <span className="text-[12px] leading-4 text-[#777a82]">
+          <span className="text-xs leading-4 text-text-tertiary">
             This action cannot be undone.
           </span>
         </div>

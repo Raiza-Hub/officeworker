@@ -11,7 +11,7 @@ export function DocumentView() {
 
   return (
     <section aria-label="Documents" className="min-h-0 flex-1 overflow-auto bg-agent-page-bg">
-      <div className="w-full px-[18px] pt-2 pb-10">
+      <div className="w-full px-4.5 pt-2 pb-10">
         <DocumentToolbar search={search} onSearchChange={setSearch} />
         <DocumentTable searchTerm={searchTerm} />
       </div>

@@ -54,26 +54,26 @@ export function FAQSection() {
     <section
       id="faq"
       aria-labelledby="faq-title"
-      className="bg-white px-4 text-[#17181a] sm:px-6"
+      className="bg-white px-4 text-ink-darker sm:px-6"
     >
-      <div className="mx-auto w-full max-w-[1408px] px-4 pt-20 pb-16 sm:px-8 sm:pt-24 sm:pb-20 lg:px-12 lg:pt-28">
+      <div className="mx-auto w-full max-w-352 px-4 pt-20 pb-16 sm:px-8 sm:pt-24 sm:pb-20 lg:px-12 lg:pt-28">
         <div className="mx-auto max-w-6xl">
           <div className="mb-16 grid gap-8 sm:mb-20 md:grid-cols-2 md:gap-16 lg:gap-24">
             <h2
               id="faq-title"
-              className="m-0 text-[48px] leading-none font-medium tracking-[-0.055em] text-[#202126]"
+              className="m-0 text-5xl leading-none font-medium tracking-[-0.055em] text-ink-deep"
             >
               FAQs
             </h2>
-            <div className="max-w-[620px]">
-              <p className="m-0 text-[24px] leading-[1.35] tracking-[-0.035em] text-[#36393f]">
+            <div className="max-w-155">
+              <p className="m-0 text-2xl leading-[1.35] tracking-[-0.035em] text-text-secondary-soft">
                 Straightforward answers about Officeworker plans, per-subject
                 pricing, and getting started.
               </p>
             </div>
           </div>
 
-          <div id="faq-questions" className="mx-auto max-w-[896px] scroll-mt-24">
+          <div id="faq-questions" className="mx-auto max-w-224 scroll-mt-24">
             {FAQ_ITEMS.map((item, index) => {
               const isOpen = openIndex === index;
               const triggerId = `faq-question-${index}`;
@@ -88,7 +88,7 @@ export function FAQSection() {
                       aria-expanded={isOpen}
                       aria-controls={panelId}
                       onClick={() => setOpenIndex(isOpen ? null : index)}
-                      className="flex min-h-[88px] w-full cursor-pointer items-center justify-between gap-6 py-5 text-left text-[16px] leading-[1.3] font-medium text-[#36393f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black/30"
+                      className="flex min-h-22 w-full cursor-pointer items-center justify-between gap-6 py-5 text-left text-base leading-[1.3] font-medium text-text-secondary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black/30"
                     >
                       <span>{item.question}</span>
                       <m.svg
@@ -97,7 +97,7 @@ export function FAQSection() {
                         fill="none"
                         animate={{ rotate: isOpen ? 45 : 0 }}
                         transition={{ duration: shouldReduceMotion ? 0 : 0.18 }}
-                        className="h-6 w-6 shrink-0 text-[#17181a]"
+                        className="h-6 w-6 shrink-0 text-ink-darker"
                       >
                         <path
                           d="M12 5v14M5 12h14"
@@ -128,7 +128,7 @@ export function FAQSection() {
                     }}
                     className="overflow-hidden"
                   >
-                    <p className="m-0 max-w-[68ch] pb-8 pr-12 text-[16px] leading-[1.65] text-[#686b72]">
+                    <p className="m-0 max-w-[68ch] pb-8 pr-12 text-base leading-[1.65] text-text-muted-alt">
                       {item.answer}
                     </p>
                     </m.div>

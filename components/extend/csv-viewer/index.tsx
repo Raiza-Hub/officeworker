@@ -276,7 +276,7 @@ export function CsvViewer({
   }
 
   return (
-    <div className={cn("flex h-[560px] w-full flex-col overflow-hidden bg-background", className)}>
+    <div className={cn("flex h-140 w-full flex-col overflow-hidden bg-background", className)}>
       {showToolbar ? (
         <div className="flex min-h-12 flex-wrap items-center justify-end gap-2 border-b bg-background px-3 py-2">
           <TooltipProvider>
@@ -300,7 +300,7 @@ export function CsvViewer({
                   }
                   modal={false}
                 >
-                  <SelectTrigger size="sm" className="w-[84px] min-w-[84px]" aria-label="Zoom level">
+                  <SelectTrigger size="sm" className="w-21 min-w-21" aria-label="Zoom level">
                     <SelectValue>{Math.round(zoom * 100)}%</SelectValue>
                   </SelectTrigger>
                   <SelectContent align="end" alignItemWithTrigger={false}>

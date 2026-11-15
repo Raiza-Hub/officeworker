@@ -41,10 +41,10 @@ export function UsageCard() {
     >
       <div className="flex min-h-[41px] items-center justify-between gap-4 pr-2">
         <div className="flex min-w-0 flex-col gap-[3px]">
-          <h2 className="m-0 text-[13px] leading-[15.5px] font-medium text-[#292a30]">
+          <h2 className="m-0 text-[13px] leading-[15.5px] font-medium text-ink-soft">
             Wallet balance
           </h2>
-          <p className="m-0 text-[12px] leading-[14.5px] font-[450] text-[#777a82]">
+          <p className="m-0 text-xs leading-[14.5px] font-[450] text-text-tertiary">
             {wallet ? `${naira(wallet.available)} available` : "Loading balance…"}
             {wallet && wallet.reserved > 0 ? ` · ${naira(wallet.reserved)} reserved for uploads` : ""}
           </p>
@@ -55,7 +55,7 @@ export function UsageCard() {
             setIsAdding((open) => !open);
             setError(null);
           }}
-          className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-[12px] leading-none font-medium text-[#292a30] transition-colors hover:bg-[#f2f2f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#626bd9]/40"
+          className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs leading-none font-medium text-ink-soft transition-colors hover:bg-[#f2f2f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           {isAdding ? "Close" : "Add credits"}
         </button>
@@ -63,7 +63,7 @@ export function UsageCard() {
 
       {isAdding && (
         <form onSubmit={startCheckout} className="mt-3 border-t border-[#efeff1] pt-3">
-          <label htmlFor="wallet-topup-amount" className="block text-[12px] font-medium text-[#45474e]">
+          <label htmlFor="wallet-topup-amount" className="block text-xs font-medium text-text-secondary">
             Amount to add (₦500–₦1,000,000)
           </label>
           <div className="mt-1.5 flex gap-2">
@@ -76,17 +76,17 @@ export function UsageCard() {
               required
               value={amount}
               onChange={(inputEvent) => setAmount(inputEvent.target.value)}
-              className="h-9 min-w-0 flex-1 rounded-md border border-[#e4e4e7] px-2.5 text-[13px] text-[#292a30] outline-none focus:border-[#858cec] focus:ring-2 focus:ring-[#626bd9]/20"
+              className="h-9 min-w-0 flex-1 rounded-md border border-[#e4e4e7] px-2.5 text-[13px] text-ink-soft outline-none focus:border-[#858cec] focus:ring-2 focus:ring-primary/20"
             />
             <button
               type="submit"
               disabled={isLoading}
-              className="h-9 shrink-0 rounded-md bg-[lch(53%_52.26_286.91)] px-3 text-[12px] font-medium text-white transition-colors hover:bg-[#626bd9] disabled:cursor-wait disabled:opacity-60"
+              className="h-9 shrink-0 rounded-md bg-[lch(53%_52.26_286.91)] px-3 text-xs font-medium text-white transition-colors hover:bg-primary disabled:cursor-wait disabled:opacity-60"
             >
               {isLoading ? "Opening…" : "Continue to Korapay"}
             </button>
           </div>
-          {error && <p role="alert" className="mb-0 mt-2 text-[12px] text-[#b42318]">{error}</p>}
+          {error && <p role="alert" className="mb-0 mt-2 text-xs text-danger-text">{error}</p>}
         </form>
       )}
     </section>

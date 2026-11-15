@@ -76,7 +76,7 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className="rounded-full px-3 py-2 text-[14px] font-medium text-black transition-[color,transform] duration-150 ease-out hover:text-black/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 active:scale-95"
+              className="rounded-full px-3 py-2 text-sm font-medium text-black transition-[color,transform] duration-150 ease-out hover:text-black/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 active:scale-95"
             >
               {link.label}
             </Link>
@@ -86,13 +86,13 @@ export function Navbar() {
         <div className="ml-auto hidden items-center gap-2 md:flex">
           <Link
             href="/login"
-            className="rounded-full px-3 py-2 text-[14px] font-medium text-black transition-[color,transform] duration-150 ease-out hover:text-black/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 active:scale-95"
+            className="rounded-full px-3 py-2 text-sm font-medium text-black transition-[color,transform] duration-150 ease-out hover:text-black/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 active:scale-95"
           >
             Log in
           </Link>
           <Link
             href="/login"
-            className="inline-flex h-9 items-center rounded-full bg-black px-4 text-[13px] font-medium text-white transition-[background-color,transform] duration-100 ease-out hover:bg-[#1a1a1a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 focus-visible:ring-offset-2 active:scale-[0.96]"
+            className="inline-flex h-9 items-center rounded-full bg-black px-4 text-[13px] font-medium text-white transition-[background-color,transform] duration-100 ease-out hover:bg-[#1a1a1a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 focus-visible:ring-offset-2 active:scale-96"
           >
             Get started
           </Link>
@@ -123,18 +123,18 @@ export function Navbar() {
         className={`mx-4 mb-4 origin-top flex flex-col gap-1 rounded-2xl bg-white/80 p-3 shadow-[0_16px_48px_rgba(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-xl transition-[opacity,transform] duration-150 ease-out [@media(prefers-reduced-transparency:reduce)]:bg-white [@media(prefers-reduced-transparency:reduce)]:backdrop-blur-none motion-reduce:transition-opacity motion-reduce:duration-150 motion-reduce:transform-none md:hidden ${
           open
             ? "pointer-events-auto opacity-100 translate-y-0 scale-100"
-            : "pointer-events-none opacity-0 -translate-y-1 scale-[0.96]"
+            : "pointer-events-none opacity-0 -translate-y-1 scale-96"
         }`}
       >
         <Link
           href="/login"
-          className="inline-flex h-11 items-center justify-center rounded-full bg-black text-[13px] font-medium text-white transition-transform duration-100 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 active:scale-[0.97]"
+          className="inline-flex h-11 items-center justify-center rounded-full bg-black text-[13px] font-medium text-white transition-transform duration-100 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 active:scale-97"
         >
           Get started
         </Link>
         <Link
           href="/login"
-          className="inline-flex h-11 items-center justify-center rounded-full bg-black/[0.05] text-[14px] font-medium text-black transition-[background-color,transform] duration-100 ease-out hover:bg-black/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 active:scale-[0.97]"
+          className="inline-flex h-11 items-center justify-center rounded-full bg-black/[0.05] text-sm font-medium text-black transition-[background-color,transform] duration-100 ease-out hover:bg-black/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 active:scale-97"
         >
           Log in
         </Link>
@@ -144,7 +144,7 @@ export function Navbar() {
             key={link.href}
             href={link.href}
             onClick={() => setOpen(false)}
-            className="rounded-lg px-3 py-3 text-[14px] font-medium text-black transition-colors duration-150 hover:bg-black/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30"
+            className="rounded-lg px-3 py-3 text-sm font-medium text-black transition-colors duration-150 hover:bg-black/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30"
           >
             {link.label}
           </Link>

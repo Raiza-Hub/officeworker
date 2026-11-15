@@ -38,12 +38,12 @@ function FeatureIllustration({ kind }: { kind: IllustrationKind }) {
     <div
       role="img"
       aria-label={`${kind} illustration placeholder`}
-      className="relative flex h-[clamp(15rem,26vw,20rem)] items-center justify-center text-[#777b83]/60"
+      className="relative flex h-[clamp(15rem,26vw,20rem)] items-center justify-center text-text-tertiary-alt/60"
     >
       <svg
         aria-hidden="true"
         viewBox="0 0 320 250"
-        className="h-full w-full max-w-[340px]"
+        className="h-full w-full max-w-85"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.15"
@@ -95,7 +95,7 @@ function FeatureIllustration({ kind }: { kind: IllustrationKind }) {
           </g>
         )}
       </svg>
-      <span className="absolute bottom-3 text-[10px] font-medium tracking-[0.06em] text-[#777b83]/70">
+      <span className="absolute bottom-3 text-[10px] font-medium tracking-[0.06em] text-text-tertiary-alt/70">
         Illustration placeholder
       </span>
     </div>
@@ -112,18 +112,18 @@ export default function Home() {
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <h1
             id="home-hero-title"
-            className="m-0 text-balance text-[clamp(3.1rem,5.2vw,4rem)] leading-[1.04] font-medium tracking-[-0.055em] text-[#17181a] max-[700px]:text-[clamp(2.75rem,10vw,4rem)] max-[700px]:leading-[1.06] max-[700px]:tracking-[-0.052em]"
+            className="m-0 text-balance text-[clamp(3.1rem,5.2vw,4rem)] leading-[1.04] font-medium tracking-[-0.055em] text-ink-darker max-[700px]:text-[clamp(2.75rem,10vw,4rem)] max-[700px]:leading-[1.06] max-[700px]:tracking-[-0.052em]"
           >
             <span className="block">The product development</span>
             <span className="block">system for teams and agents</span>
           </h1>
 
-          <div className="mt-[42px] flex items-center justify-between gap-8 max-[700px]:mt-7 max-[700px]:flex-col max-[700px]:items-start max-[700px]:gap-5">
-            <p className="m-0 max-w-[65ch] text-[15px] leading-[1.5] text-[#686b72]">
+          <div className="mt-10.5 flex items-center justify-between gap-8 max-[700px]:mt-7 max-[700px]:flex-col max-[700px]:items-start max-[700px]:gap-5">
+            <p className="m-0 max-w-[65ch] text-[15px] leading-[1.5] text-text-muted-alt">
               Purpose-built for planning and building products. Designed for the AI era.
             </p>
             <p
-              className="m-0 flex shrink-0 items-center gap-4 text-[15px] leading-[1.5] text-[#202126]"
+              className="m-0 flex shrink-0 items-center gap-4 text-[15px] leading-[1.5] text-ink-deep"
               aria-label="New: Loops"
             >
               <span>New</span>
@@ -138,14 +138,14 @@ export default function Home() {
       <section
         id="how-it-works"
         aria-labelledby="product-principles-title"
-        className="scroll-mt-20 border-b border-black/10 bg-white pt-20 pb-28 text-[#17181a] sm:pt-24 sm:pb-32"
+        className="scroll-mt-20 border-b border-black/10 bg-white pt-20 pb-28 text-ink-darker sm:pt-24 sm:pb-32"
       >
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <h2
             id="product-principles-title"
-            className="mb-28 max-w-[1120px] text-balance text-[48px] leading-[1.05] font-medium tracking-[-0.055em] max-[700px]:mb-20"
+            className="mb-28 max-w-280 text-balance text-5xl leading-[1.05] font-medium tracking-[-0.055em] max-[700px]:mb-20"
           >
-            <span className="text-[#202126]">A new species of product tool. </span>
+            <span className="text-ink-deep">A new species of product tool. </span>
             <span className="text-[#7b7e85]">
               Purpose-built for modern teams with AI workflows at its core,
               Officeworker sets a new standard for planning and building products.
@@ -163,10 +163,10 @@ export default function Home() {
                   {feature.figure}
                 </p>
                 <FeatureIllustration kind={feature.illustration} />
-                <h3 className="m-0 text-[15px] font-medium leading-6 text-[#202126]">
+                <h3 className="m-0 text-[15px] font-medium leading-6 text-ink-deep">
                   {feature.title}
                 </h3>
-                <p className="mb-0 mt-2 max-w-[38ch] text-[15px] leading-[1.55] text-[#686b72]">
+                <p className="mb-0 mt-2 max-w-[38ch] text-[15px] leading-[1.55] text-text-muted-alt">
                   {feature.description}
                 </p>
               </article>

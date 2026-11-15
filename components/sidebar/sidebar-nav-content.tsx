@@ -36,8 +36,6 @@ const workspaceItems: SidebarItem[] = [
   { label: "Billings", icon: CreditCard, href: "/billing" },
 ];
 
-const iconClassName = "size-3.5 shrink-0";
-const iconStrokeWidth = 2.25;
 const focusRingClassName = sidebarLinkFocusRingClassName;
 
 function getInitials(name: string) {
@@ -59,8 +57,8 @@ function SidebarNavLink({
     <SidebarLink href={item.href} active={active} aria-label={item.label}>
       <Icon
         aria-hidden="true"
-        className={iconClassName}
-        strokeWidth={iconStrokeWidth}
+        className="size-3.5 shrink-0"
+        strokeWidth={2.25}
       />
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
     </SidebarLink>
@@ -80,31 +78,48 @@ export function SidebarNavContent() {
     currentUser?.name?.trim() || currentUser?.email?.trim() || "Workspace";
   const profileImage = currentUser?.image?.trim() || null;
   const initials = getInitials(displayName);
+  const isLoading = currentUser === undefined;
 
   return (
-    <div className="box-border flex h-full w-[244px] shrink-0 flex-col overflow-hidden bg-sidebar-bg pt-2 text-sidebar-text">
+    <div className="box-border flex h-full w-61 shrink-0 flex-col overflow-hidden bg-sidebar-bg pt-2 text-sidebar-text">
       <div className="flex h-11 shrink-0 items-center gap-2 px-3">
         <button
           type="button"
           aria-label="Open workspace menu"
-          className={`flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-[10px] px-[5px] pr-[9px] text-left text-sidebar-text transition-colors duration-100 ease-out hover:bg-[#f3f3f4] ${focusRingClassName} motion-reduce:transition-none`}
+          aria-busy={isLoading}
+          className={`flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-[10px] px-[5px] pr-[9px] text-left text-sidebar-text transition-colors duration-100 ease-out hover:bg-secondary ${focusRingClassName} motion-reduce:transition-none`}
         >
-          <span className="inline-flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-sidebar-avatar text-[10px] leading-none font-semibold tracking-[-0.02em] text-white">
-            {profileImage ? (
-              <Image
-                src={profileImage}
-                alt=""
-                width={20}
-                height={20}
-                className="size-5 object-cover"
+          {isLoading ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="size-5 shrink-0 animate-pulse rounded-full bg-border-muted"
               />
-            ) : (
-              initials
-            )}
-          </span>
-          <span className="truncate text-[13px] leading-[23px] font-[550]">
-            {displayName}
-          </span>
+              <span
+                aria-hidden="true"
+                className="h-3 w-24 animate-pulse rounded bg-border-muted"
+              />
+            </>
+          ) : (
+            <>
+              <span className="inline-flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-sidebar-avatar text-[10px] leading-none font-semibold tracking-[-0.02em] text-white">
+                {profileImage ? (
+                  <Image
+                    src={profileImage}
+                    alt=""
+                    width={20}
+                    height={20}
+                    className="size-5 object-cover"
+                  />
+                ) : (
+                  initials
+                )}
+              </span>
+              <span className="truncate text-[13px] leading-[23px] font-[550]">
+                {displayName}
+              </span>
+            </>
+          )}
         </button>
 
         <div className="flex items-center gap-0.5">
@@ -112,12 +127,12 @@ export function SidebarNavContent() {
             type="button"
             aria-label="Search"
             title="Search"
-            className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#646770] transition-colors hover:bg-[#f0f0f2] hover:text-[#303137] ${focusRingClassName}`}
+            className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#646770] transition-colors hover:bg-surface-hover-soft hover:text-secondary-foreground ${focusRingClassName}`}
           >
             <Search
               aria-hidden="true"
-              className={iconClassName}
-              strokeWidth={iconStrokeWidth}
+              className="size-3.5 shrink-0"
+              strokeWidth={2.25}
             />
           </button>
           {!isMobile && <SidebarTrigger />}
@@ -142,13 +157,13 @@ export function SidebarNavContent() {
           type="button"
           aria-expanded={settingsExpanded}
           onClick={() => setSettingsExpanded((v) => !v)}
-          className={`flex h-7 w-full items-center gap-1 rounded-lg px-[5px] text-left text-[12px] leading-[14px] font-medium text-[#62656d] transition-colors duration-100 ease-out hover:bg-[#f3f3f4] hover:text-sidebar-foreground ${focusRingClassName} motion-reduce:transition-none`}
+          className={`flex h-7 w-full items-center gap-1 rounded-lg px-[5px] text-left text-xs leading-3.5 font-medium text-[#62656d] transition-colors duration-100 ease-out hover:bg-secondary hover:text-sidebar-foreground ${focusRingClassName} motion-reduce:transition-none`}
         >
           <span className="flex-1">Settings</span>
           <ChevronDown
             aria-hidden="true"
             className={`size-3.5 shrink-0 text-[#858890] transition-transform duration-150 ${settingsExpanded ? "" : "-rotate-90"}`}
-            strokeWidth={iconStrokeWidth}
+            strokeWidth={2.25}
           />
         </button>
 

@@ -16,7 +16,7 @@ function ActivityText({ text }: { text: string }) {
   if (!displayText) return null;
 
   return (
-    <p className="m-0 max-w-none whitespace-pre-wrap text-[14px] leading-[22px] text-[#24252a]">
+    <p className="m-0 max-w-none whitespace-pre-wrap text-sm leading-5.5 text-ink">
       {displayText}
     </p>
   );
@@ -24,7 +24,7 @@ function ActivityText({ text }: { text: string }) {
 
 function ActivityContent({ parts }: { parts: UIMessagePartList }) {
   return (
-    <div className="mt-2 flex flex-col gap-2 border-l border-[#e7e7e9] pl-3">
+    <div className="mt-2 flex flex-col gap-2 border-l border-border pl-3">
       {parts.map((part, index) => {
         if (part.type === "text") {
           const text = partText(part);
@@ -120,7 +120,7 @@ export function Reasoning({
             type="button"
             aria-expanded={open}
             onClick={() => setOpen((value) => !value)}
-            className="inline-flex items-center gap-1.5 text-left text-[12px] leading-none text-[#85878e] transition-colors hover:text-[#24252a]"
+            className="inline-flex items-center gap-1.5 text-left text-xs leading-none text-muted-foreground transition-colors hover:text-ink"
           >
             <span>{label}</span>
             <ChevronDown
@@ -133,7 +133,7 @@ export function Reasoning({
         </>
       ) : (
         <div className="flex flex-col items-start gap-2">
-          <div className="inline-flex items-center gap-1.5 text-[12px] leading-none text-[#85878e]">
+          <div className="inline-flex items-center gap-1.5 text-xs leading-none text-muted-foreground">
             {streaming && (
               <Loader
                 aria-hidden="true"

@@ -19,7 +19,7 @@ export function TextPart({ text }: { text: string }) {
   const cleanText = smoothText.replace(/\[submission:[^\]]*\]?/g, "").trimEnd();
   if (!cleanText) return null;
   return (
-    <p className="m-0 max-w-none whitespace-pre-wrap text-[14px] leading-[22px] text-[#24252a]">
+    <p className="m-0 max-w-none whitespace-pre-wrap text-sm leading-5.5 text-ink">
       {cleanText}
     </p>
   );
@@ -39,7 +39,7 @@ export function AssistantMessage({
   const entries = buildEntries(parts);
   if (status === "failed" && !cancelled) {
     return (
-      <div className="flex items-center gap-1.5 text-[12px] leading-none text-[#85878e]">
+      <div className="flex items-center gap-1.5 text-xs leading-none text-muted-foreground">
         <AlertTriangle
           aria-hidden="true"
           className="size-3.5 shrink-0 text-[#d64545]"

@@ -71,13 +71,13 @@ export function DashboardSidebar() {
         tabIndex={-1}
         className={
           isMobile
-            ? `fixed inset-y-0 left-0 z-50 h-full w-[244px] shrink-0 overflow-hidden bg-sidebar-bg transition-transform duration-300 ${ease} motion-reduce:transition-none ${
+            ? `fixed inset-y-0 left-0 z-50 h-full w-61 shrink-0 overflow-hidden bg-sidebar-bg transition-transform duration-300 ${ease} motion-reduce:transition-none ${
                 renderMobileOpen
                   ? "pointer-events-auto translate-x-0 shadow-xl"
                   : "pointer-events-none -translate-x-full"
               }`
             : `hidden h-full shrink-0 overflow-hidden bg-sidebar-bg transition-[width] duration-300 ${ease} motion-reduce:transition-none md:block ${
-                renderDesktopOpen ? "w-[244px]" : "w-0"
+                renderDesktopOpen ? "w-61" : "w-0"
               }`
         }
       >
