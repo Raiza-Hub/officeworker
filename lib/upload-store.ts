@@ -148,17 +148,3 @@ export async function listUploads(): Promise<StoredUpload[]> {
   const result = await withStore("readonly", (store) => store.getAll());
   return (result as StoredUpload[] | null) ?? [];
 }
-
-export async function pruneUploads(validStorageKeys: Set<string>, maxAgeMs = 7 * 24 * 60 * 60 * 1000): Promise<void> {
-  const all = await listUploads();
-  const now = Date.now();
-  await Promise.all(
-    all.map(async (entry) => {
-      const staleByAge = now - entry.createdAt > maxAgeMs;
-      const staleByKey = entry.storageKey != null && !validStorageKeys.has(entry.storageKey);
-      if (staleByAge || staleByKey) {
-        await deleteUpload(entry.id);
-      }
-    }),
-  );
-}

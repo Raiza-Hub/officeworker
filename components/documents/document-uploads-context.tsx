@@ -388,10 +388,10 @@ export function DocumentUploadsProvider({ children }: { children: ReactNode }) {
           if (uploadId && storageKey) {
             await abortMultipartUpload(storageKey, uploadId).catch(() => undefined);
           }
-          await deleteDocument({ id: doc._id }).catch(() => undefined);
           if (storageKey) {
             await deleteUploadedObject(storageKey);
           }
+          await deleteDocument({ id: doc._id }).catch(() => undefined);
           if (entryId) {
             await deleteStoredUpload(entryId);
           }

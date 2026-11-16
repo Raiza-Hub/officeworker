@@ -386,6 +386,7 @@ export async function uploadMultipartResumable(args: {
         emitProgress();
         return;
       } catch (error) {
+        if (error instanceof UploadCanceledError) throw error;
         partLoaded.set(partNumber, 0);
         emitProgress();
         if (attempt === PART_RETRY_DELAYS.length) throw error;
