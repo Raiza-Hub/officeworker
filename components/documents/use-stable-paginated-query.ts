@@ -1,10 +1,15 @@
 "use client";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useConvexAuth } from "convex/react";
 import { usePaginatedQuery } from "convex-helpers/react/cache/hooks";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
+import {
+  defaultDocumentFilters,
+  documentFiltersToQueryArgs,
+  type DocumentFilters,
+} from "@/components/documents/document-filters";
 
 export const DOCUMENTS_PAGE_SIZE = 50;
 
@@ -26,13 +31,19 @@ type StableDocumentSearch = {
  * The render-phase ref capture is the stable-results mechanic from that
  * official recipe, hence the two scoped react-hooks rule dispositions below.
  */
-export function useStableDocumentSearch(searchTerm: string): StableDocumentSearch {
+export function useStableDocumentSearch(
+  searchTerm: string,
+  filters: DocumentFilters = defaultDocumentFilters,
+): StableDocumentSearch {
   const { isAuthenticated } = useConvexAuth();
-  const result = usePaginatedQuery(
-    api.documents.searchList,
-    isAuthenticated ? { searchTerm } : "skip",
-    { initialNumItems: DOCUMENTS_PAGE_SIZE },
+  const filterArgs = useMemo(() => documentFiltersToQueryArgs(filters), [filters]);
+  const queryArgs = useMemo(
+    () => (isAuthenticated ? { searchTerm, ...filterArgs } : "skip"),
+    [isAuthenticated, searchTerm, filterArgs],
   );
+  const result = usePaginatedQuery(api.documents.searchList, queryArgs, {
+    initialNumItems: DOCUMENTS_PAGE_SIZE,
+  });
   const isLive =
     result.status !== "LoadingFirstPage" && result.status !== "LoadingMore";
   const live: StableDocumentSearch = {

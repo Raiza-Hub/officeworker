@@ -1,4 +1,7 @@
 import { S3Client } from "@aws-sdk/client-s3";
+import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "@/convex/_generated/api";
 
 export type R2Config = {
   accountId: string;
@@ -25,4 +28,15 @@ export function createR2Client(config: R2Config): S3Client {
       secretAccessKey: config.secretAccessKey,
     },
   });
+}
+
+export async function requireOwnedStorageKey(storageKey: string): Promise<boolean> {
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!convexUrl) return false;
+  const token = await convexAuthNextjsToken();
+  if (!token) return false;
+  const client = new ConvexHttpClient(convexUrl);
+  client.setAuth(token);
+  const docId = await client.query(api.documents.getOwnedIdByStorageKey, { storageKey });
+  return docId !== null;
 }

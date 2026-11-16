@@ -40,11 +40,13 @@ export default defineSchema({
     storageKey: v.string(),
     status: v.union(v.literal("Uploading"), v.literal("Success")),
     ownerId: v.id("users"),
+    kind: v.optional(v.string()),
+    sizeBucket: v.optional(v.string()),
   })
     .index("by_owner", ["ownerId"])
     .searchIndex("search_name", {
       searchField: "name",
-      filterFields: ["ownerId"],
+      filterFields: ["ownerId", "kind", "sizeBucket", "status"],
     }),
 
   // Portal registry — one entry per supported teacher portal (DiPER first).
