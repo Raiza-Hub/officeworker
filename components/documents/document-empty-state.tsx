@@ -46,7 +46,15 @@ function NotionMark() {
   );
 }
 
-export function DocumentEmptyState() {
+export function DocumentEmptyState({ hasActiveFilters }: { hasActiveFilters?: boolean }) {
+  if (hasActiveFilters) {
+    return (
+      <div className="mt-8 rounded-[9px] border border-dashed border-[#dedee3] px-6 py-6 text-xs font-medium text-text-dim">
+        No documents match your filters
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-125 w-full items-center justify-center overflow-hidden px-4">
       <div className="-translate-y-2 flex w-full max-w-170 flex-col items-center text-center">
