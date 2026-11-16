@@ -1,17 +1,25 @@
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  CreateMultipartUploadCommand,
+  PutObjectCommand,
+  UploadPartCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { isAuthenticatedNextjs } from "@convex-dev/auth/nextjs/server";
 import { z } from "zod";
 import { createR2Client, getR2Config } from "../r2";
 
 const UPLOAD_TTL_SECONDS = 900;
+const PART_URL_TTL_SECONDS = 86_400;
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 const MAX_KEY_NAME_LENGTH = 200;
+const MULTIPART_THRESHOLD_BYTES = 5 * 1024 * 1024;
+const PART_SIZE_BYTES = 8 * 1024 * 1024;
 
 const uploadUrlRequestSchema = z.object({
   fileName: z.string().trim().min(1).max(512),
   fileType: z.string().trim().min(1).max(255),
   fileSize: z.number().int().positive().max(MAX_FILE_SIZE_BYTES),
+  wantsMultipart: z.boolean().optional(),
 });
 
 function presignKey(fileName: string): string {
@@ -57,6 +65,47 @@ export async function POST(request: Request) {
   const key = `documents/${crypto.randomUUID()}-${presignKey(parsed.fileName)}`;
   try {
     const s3 = createR2Client(config);
+
+    if (parsed.wantsMultipart && parsed.fileSize >= MULTIPART_THRESHOLD_BYTES) {
+      const created = await s3.send(
+        new CreateMultipartUploadCommand({
+          Bucket: config.bucket,
+          Key: key,
+          ContentType: parsed.fileType,
+        }),
+      );
+      const uploadId = created.UploadId;
+      if (!uploadId) {
+        return Response.json({ error: "Failed to create multipart upload" }, { status: 502 });
+      }
+
+      const partCount = Math.ceil(parsed.fileSize / PART_SIZE_BYTES);
+      const partUrls: Record<number, string> = {};
+      await Promise.all(
+        Array.from({ length: partCount }, async (_, i) => {
+          const partNumber = i + 1;
+          partUrls[partNumber] = await getSignedUrl(
+            s3,
+            new UploadPartCommand({
+              Bucket: config.bucket,
+              Key: key,
+              UploadId: uploadId,
+              PartNumber: partNumber,
+            }),
+            { expiresIn: PART_URL_TTL_SECONDS },
+          );
+        }),
+      );
+
+      return Response.json({
+        mode: "multipart",
+        key,
+        uploadId,
+        partSize: PART_SIZE_BYTES,
+        partUrls,
+      });
+    }
+
     const url = await getSignedUrl(
       s3,
       new PutObjectCommand({
@@ -66,7 +115,7 @@ export async function POST(request: Request) {
       }),
       { expiresIn: UPLOAD_TTL_SECONDS },
     );
-    return Response.json({ url, key });
+    return Response.json({ mode: "single", url, key });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Failed to create the upload URL" },

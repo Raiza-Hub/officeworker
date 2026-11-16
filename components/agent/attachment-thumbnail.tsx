@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { LoaderCircle, X } from "lucide-react";
 import { FileThumbnail } from "@/components/extend/file-thumbnail";
 import { fetchPreviewUrl, peekCachedPreviewUrl } from "@/components/agent/preview-url-cache";
+import { SquishProgressBar } from "@/components/ui/squish-progress-bar";
 import { toast } from "sonner";
 import { isPreviewSupported } from "@/lib/file-types";
 
@@ -38,12 +39,22 @@ export function AttachmentThumbnail({
   onRemove,
   isUploading = false,
   inverse = false,
+  className = "w-28",
+  nameLines = 1,
+  progress = null,
+  footer,
+  onCancel,
 }: {
   attachment: AttachmentThumbnailData;
   onPreview?: () => void;
   onRemove?: () => void;
   isUploading?: boolean;
   inverse?: boolean;
+  className?: string;
+  nameLines?: 1 | 2;
+  progress?: number | "indeterminate" | null;
+  footer?: React.ReactNode;
+  onCancel?: () => void;
 }) {
   const [previewSource, setPreviewSource] = useState<{
     key: string;
@@ -83,25 +94,45 @@ export function AttachmentThumbnail({
     };
   }, [attachment.key, previewSource?.key]);
 
+  const progressBar =
+    progress === null ? null : progress === "indeterminate" ? (
+      <div
+        key="indeterminate"
+        role="progressbar"
+        aria-label={`Uploading ${attachment.name}`}
+        className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-border-muted"
+      >
+        <div className="h-full w-full animate-pulse rounded-full bg-primary/60" />
+      </div>
+    ) : (
+      <SquishProgressBar
+        key="determinate"
+        progress={progress}
+        ariaLabel={`Uploading ${attachment.name}`}
+      />
+    );
+
   const preview = (
     <>
       <AttachmentThumbnailPreview
         attachment={attachment}
         fileUrl={fileUrl}
-        isUploading={isUploading}
+        isUploading={isUploading || progress !== null}
         sourceError={sourceError}
       />
       <span
         title={attachment.name}
-        className={`mt-1 block w-full truncate text-left text-[11px] leading-4 ${inverse ? "text-white" : "text-text-secondary"}`}
+        className={`mt-1 block w-full text-left text-[11px] leading-4 ${inverse ? "text-white" : "text-text-secondary"} ${nameLines === 2 ? "line-clamp-2 break-words" : "truncate"}`}
       >
         {attachment.name}
       </span>
+      {progressBar}
+      {footer ? <div className="mt-1.5">{footer}</div> : null}
     </>
   );
 
   return (
-    <div className="group/attachment relative w-28 shrink-0">
+    <div className={`group/attachment relative shrink-0 ${className}`}>
       {canPreview ? (
         <button
           type="button"
@@ -138,7 +169,7 @@ export function AttachmentThumbnail({
           {preview}
         </div>
       )}
-      {isUploading ? (
+      {isUploading && progress === null ? (
         <span
           role="status"
           aria-label={`Uploading ${attachment.name}`}
@@ -146,6 +177,16 @@ export function AttachmentThumbnail({
         >
           <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" />
         </span>
+      ) : null}
+      {onCancel && typeof progress === "number" ? (
+        <button
+          type="button"
+          aria-label={`Cancel uploading ${attachment.name}`}
+          onClick={onCancel}
+          className="absolute -top-1.5 -right-1.5 inline-flex size-5 items-center justify-center rounded-full border border-white bg-text-secondary text-white shadow-sm transition-colors hover:bg-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        >
+          <X aria-hidden="true" className="size-3" strokeWidth={2.2} />
+        </button>
       ) : null}
       {onRemove ? (
         <button
