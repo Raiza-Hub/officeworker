@@ -108,6 +108,22 @@ body {
   }
 }
 
+@keyframes slide-commit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slide-commit-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shimmer-text {
     animation: none;
