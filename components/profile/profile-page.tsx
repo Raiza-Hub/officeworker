@@ -4,10 +4,10 @@ import { useConvexAuth } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "@/convex/_generated/api";
 import { DangerZoneSection } from "@/components/profile/danger-zone-section";
-import { ProfileDetailsCard } from "@/components/profile/profile-details-card";
+import { ProfileIdentity } from "@/components/profile/profile-identity";
 import { ProfileHeading } from "@/components/profile/profile-heading";
 import {
-  ProfileDetailsCardLoading,
+  ProfileIdentityLoading,
   WorkspaceAccessSectionLoading,
 } from "@/components/profile/profile-page-loading";
 import { WorkspaceAccessSection } from "@/components/profile/workspace-access-section";
@@ -25,7 +25,7 @@ export function ProfilePage() {
       <div className="mx-auto w-full max-w-160">
         <ProfileHeading />
         <div className="mt-8">
-          {isLoading ? <ProfileDetailsCardLoading /> : <ProfileDetailsCard />}
+          {isLoading ? <ProfileIdentityLoading /> : <ProfileIdentity />}
         </div>
         {isLoading ? (
           <WorkspaceAccessSectionLoading />
