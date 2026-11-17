@@ -33,11 +33,13 @@ function WorkspaceAccessCard() {
     }
   }
 
-  const workspaceLabel = isLoading
-    ? "Checking connection…"
-    : connectedPortal
-      ? connectedPortal.portalUrl
-      : "Not connected";
+  if (isLoading) {
+    return <div className="h-16 animate-pulse rounded-lg bg-secondary" />;
+  }
+
+  const workspaceLabel = connectedPortal
+    ? connectedPortal.portalUrl
+    : "Not connected";
   const statusLabel = connectedPortal
     ? connectedPortal.portalEmail
     : connection?.status === "error"
@@ -64,7 +66,7 @@ function WorkspaceAccessCard() {
       <button
         type="button"
         onClick={() => void handleAction()}
-        disabled={isLoading || isPending}
+        disabled={isPending}
         className="inline-flex h-8 shrink-0 items-center rounded-full px-3 text-[13px] leading-none font-medium text-secondary-foreground transition-colors hover:bg-surface-hover-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-wait disabled:opacity-60"
       >
         {isConnected ? "Log out" : "Connect"}
