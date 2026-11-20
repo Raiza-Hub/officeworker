@@ -1,13 +1,11 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
-import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
 
 const statusValidator = v.union(
-  v.literal("draft"),
   v.literal("preparing"),
-  v.literal("awaiting_scores"),
   v.literal("awaiting_review"),
   v.literal("login_failed"),
   v.literal("submitting"),
@@ -30,7 +28,6 @@ const browserJobValidator = v.object({
   sessionId: v.optional(v.string()),
   workspaceId: v.optional(v.string()),
   profileId: v.optional(v.string()),
-  // v4 events cursor (`nextAfter/after`) is an integer.
   lastEventCursor: v.optional(v.number()),
   lastSyncedAt: v.optional(v.number()),
   keepAliveUntil: v.optional(v.number()),
@@ -48,7 +45,6 @@ const browserJobPatchValidator = v.object({
   sessionId: v.optional(v.string()),
   workspaceId: v.optional(v.string()),
   profileId: v.optional(v.string()),
-  // v4 events cursor (`nextAfter/after`) is an integer.
   lastEventCursor: v.optional(v.number()),
   lastSyncedAt: v.optional(v.number()),
   keepAliveUntil: v.optional(v.number()),
@@ -56,6 +52,13 @@ const browserJobPatchValidator = v.object({
   lastError: v.optional(v.string()),
   resultSummary: v.optional(v.string()),
   syncDisabled: v.optional(v.boolean()),
+});
+
+const artifactFileValidator = v.object({
+  key: v.string(),
+  name: v.string(),
+  size: v.optional(v.number()),
+  sourcePath: v.optional(v.string()),
 });
 
 async function getOwnedSubmission(
@@ -76,16 +79,20 @@ async function listOwnedSubmissions(ctx: QueryCtx, userId: Id<"users">) {
     .take(50);
 }
 
+function walletUploadDescription(submission: { goal: string }) {
+  const goal = submission.goal.trim().replace(/\s+/g, " ");
+  const short = goal.length > 80 ? `${goal.slice(0, 77)}...` : goal || "Portal upload";
+  return `${short} successful upload`;
+}
+
 export const createSubmissionDraft = internalMutation({
   args: {
     userId: v.id("users"),
     adapterId: v.string(),
     portalUrl: v.string(),
     threadId: v.optional(v.string()),
-    className: v.string(),
-    subject: v.string(),
-    term: v.string(),
-    academicYear: v.string(),
+    goal: v.string(),
+    inputs: v.optional(v.array(artifactFileValidator)),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -95,17 +102,22 @@ export const createSubmissionDraft = internalMutation({
       .first();
     const chargeAmount = wallet?.plan === "pro" ? 1000 : 500;
     const id = await ctx.db.insert("submissions", {
-      ...args,
+      userId: args.userId,
+      adapterId: args.adapterId,
+      portalUrl: args.portalUrl,
+      threadId: args.threadId,
+      goal: args.goal.trim(),
       chargeAmount,
       status: "preparing",
       browserJob: undefined,
-      files: { uploads: [] },
+      files: { inputs: args.inputs ?? [], outputs: [] },
       createdAt: now,
       updatedAt: now,
     });
     await ctx.db.insert("auditLog", {
       submissionId: id,
       event: "created",
+      detail: { goal: args.goal.trim() },
       at: now,
     });
     return id;
@@ -118,12 +130,9 @@ export const updateSubmission = internalMutation({
     expectStatus: v.optional(v.string()),
     status: v.optional(statusValidator),
     error: v.optional(v.string()),
-    templateKey: v.optional(v.string()),
-    templateName: v.optional(v.string()),
-    filledKey: v.optional(v.string()),
-    filledName: v.optional(v.string()),
+    appendOutputs: v.optional(v.array(artifactFileValidator)),
+    uploadCandidate: v.optional(v.union(artifactFileValidator, v.null())),
     edits: v.optional(v.array(appliedEditValidator)),
-    needsReview: v.optional(v.boolean()),
     browserJob: v.optional(browserJobValidator),
     browserJobPatch: v.optional(browserJobPatchValidator),
     auditEvent: v.optional(v.string()),
@@ -133,10 +142,7 @@ export const updateSubmission = internalMutation({
     const submission = await ctx.db.get(args.submissionId);
     if (submission === null) throw new Error("Submission not found");
 
-    if (
-      args.expectStatus !== undefined &&
-      submission.status !== args.expectStatus
-    ) {
+    if (args.expectStatus !== undefined && submission.status !== args.expectStatus) {
       return { applied: false as const };
     }
     if (submission.chargeStatus === "charged") {
@@ -167,14 +173,12 @@ export const updateSubmission = internalMutation({
         kind: "upload",
         amount: -chargeAmount,
         reference: `submission:${args.submissionId}`,
-        description: `${submission.subject} ${submission.term} ${submission.academicYear} successful upload`,
+        description: walletUploadDescription(submission),
         createdAt: Date.now(),
       });
       patch.chargeStatus = "charged";
     } else if (
-      (args.status === "failed" ||
-        args.status === "login_failed" ||
-        args.status === "cancelled") &&
+      (args.status === "failed" || args.status === "login_failed" || args.status === "cancelled") &&
       submission.chargeStatus === "reserved"
     ) {
       const wallet = await ctx.db
@@ -195,25 +199,23 @@ export const updateSubmission = internalMutation({
       patch.error = args.error;
     } else if (
       args.status !== undefined &&
-      ["draft", "preparing", "awaiting_scores", "awaiting_review", "submitting", "done", "cancelled"].includes(args.status)
+      ["preparing", "awaiting_review", "submitting", "done", "cancelled"].includes(args.status)
     ) {
       patch.error = undefined;
     }
 
-    if (args.templateKey !== undefined && args.templateName !== undefined) {
-      patch.files = {
-        ...submission.files,
-        template: { key: args.templateKey, originalName: args.templateName },
-      };
+    let files = submission.files;
+    if (args.appendOutputs && args.appendOutputs.length > 0) {
+      const byKey = new Map(files.outputs.map((f) => [f.key, f]));
+      for (const f of args.appendOutputs) byKey.set(f.key, f);
+      files = { ...files, outputs: [...byKey.values()] };
     }
-    if (args.filledKey !== undefined && args.filledName !== undefined) {
-      patch.files = {
-        ...(patch.files ?? submission.files),
-        filled: { key: args.filledKey, originalName: args.filledName },
-      };
+    if (args.uploadCandidate !== undefined) {
+      files = { ...files, uploadCandidate: args.uploadCandidate ?? undefined };
     }
+    if (files !== submission.files) patch.files = files;
+
     if (args.edits !== undefined) patch.edits = args.edits;
-    if (args.needsReview !== undefined) patch.needsReview = args.needsReview;
 
     if (args.browserJob !== undefined) {
       patch.browserJob = args.browserJob;
@@ -235,6 +237,43 @@ export const updateSubmission = internalMutation({
   },
 });
 
+export const releaseSubmissionCharge = internalMutation({
+  args: { submissionId: v.id("submissions"), userId: v.id("users"), reason: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const submission = await ctx.db.get(args.submissionId);
+    if (!submission || submission.userId !== args.userId) {
+      throw new Error("Submission not found");
+    }
+    if (submission.chargeStatus !== "reserved") return { released: false as const };
+    const chargeAmount = submission.chargeAmount ?? 500;
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+    if (wallet) {
+      await ctx.db.patch(wallet._id, {
+        reserved: Math.max(0, wallet.reserved - chargeAmount),
+        updatedAt: Date.now(),
+      });
+    }
+    await ctx.db.patch(submission._id, {
+      chargeStatus: "released",
+      status:
+        submission.status === "submitting" || submission.status === "preparing"
+          ? "awaiting_review"
+          : submission.status,
+      updatedAt: Date.now(),
+    });
+    await ctx.db.insert("auditLog", {
+      submissionId: submission._id,
+      event: "charge_released",
+      detail: { reason: args.reason ?? "released" },
+      at: Date.now(),
+    });
+    return { released: true as const };
+  },
+});
+
 export const reserveSubmissionCharge = internalMutation({
   args: { submissionId: v.id("submissions"), userId: v.id("users") },
   handler: async (ctx, args) => {
@@ -244,6 +283,9 @@ export const reserveSubmissionCharge = internalMutation({
     }
     if (submission.status !== "awaiting_review") {
       throw new Error(`Cannot reserve funds while submission is ${submission.status}`);
+    }
+    if (!submission.files.uploadCandidate) {
+      throw new Error("No upload candidate is ready for this submission");
     }
     if (submission.chargeStatus === "reserved") {
       return { amount: submission.chargeAmount ?? 500 };
@@ -282,7 +324,8 @@ export const reserveSubmissionCharge = internalMutation({
     await ctx.db.patch(submission._id, {
       chargeAmount,
       chargeStatus: "reserved",
-      needsReview: false,
+      status: "submitting",
+      updatedAt: Date.now(),
     });
     return { amount: chargeAmount };
   },

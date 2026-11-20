@@ -3,9 +3,7 @@ import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
 const submissionStatus = v.union(
-  v.literal("draft"),
   v.literal("preparing"),
-  v.literal("awaiting_scores"),
   v.literal("awaiting_review"),
   v.literal("login_failed"),
   v.literal("submitting"),
@@ -16,14 +14,13 @@ const submissionStatus = v.union(
 
 const browserJobValidator = v.object({
   provider: v.literal("browser_use"),
-  intent: v.string(), // e.g. download, upload, login_bootstrap
+  intent: v.string(),
   phase: v.optional(v.string()),
   status: v.optional(v.string()),
   runId: v.optional(v.string()),
   sessionId: v.optional(v.string()),
   workspaceId: v.optional(v.string()),
   profileId: v.optional(v.string()),
-  // v4 events cursor (`nextAfter/after`) is an integer.
   lastEventCursor: v.optional(v.number()),
   lastSyncedAt: v.optional(v.number()),
   keepAliveUntil: v.optional(v.number()),
@@ -31,6 +28,13 @@ const browserJobValidator = v.object({
   lastError: v.optional(v.string()),
   resultSummary: v.optional(v.string()),
   syncDisabled: v.optional(v.boolean()),
+});
+
+const artifactFileValidator = v.object({
+  key: v.string(),
+  name: v.string(),
+  size: v.optional(v.number()),
+  sourcePath: v.optional(v.string()),
 });
 
 export default defineSchema({
@@ -111,10 +115,7 @@ export default defineSchema({
     adapterId: v.string(),
     portalUrl: v.string(),
     threadId: v.optional(v.string()),
-    className: v.string(),
-    subject: v.string(),
-    term: v.string(),
-    academicYear: v.string(),
+    goal: v.string(),
     status: submissionStatus,
     chargeAmount: v.optional(v.number()),
     chargeStatus: v.optional(
@@ -128,23 +129,12 @@ export default defineSchema({
         }),
       ),
     ),
-    needsReview: v.optional(v.boolean()),
     browserJob: v.optional(browserJobValidator),
     error: v.optional(v.string()),
     files: v.object({
-      uploads: v.array(
-        v.object({
-          key: v.string(),
-          name: v.string(),
-          size: v.optional(v.number()),
-        }),
-      ),
-      template: v.optional(
-        v.object({ key: v.string(), originalName: v.string() }),
-      ),
-      filled: v.optional(
-        v.object({ key: v.string(), originalName: v.string() }),
-      ),
+      inputs: v.array(artifactFileValidator),
+      outputs: v.array(artifactFileValidator),
+      uploadCandidate: v.optional(artifactFileValidator),
     }),
     createdAt: v.number(),
     updatedAt: v.number(),

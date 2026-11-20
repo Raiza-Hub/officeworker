@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import {
   FileSearch,
+  FileText,
   ListChecks,
   Pencil,
   PlugZap,
+  RefreshCcw,
   RotateCcw,
   Send,
   Upload,
+  Wallet,
   Wrench,
   XCircle,
   type LucideIcon,
@@ -16,14 +19,17 @@ import { ShimmerText } from "@/components/agent/shimmer";
 
 export const TOOL_ICONS: Record<string, LucideIcon> = {
   get_connection_status: PlugZap,
-  create_submission: Upload,
-  get_submission: FileSearch,
-  list_submissions: ListChecks,
-  update_score: Pencil,
-  resolve_name_match: Pencil,
+  check_wallet_balance: Wallet,
+  create_portal_job: Upload,
+  continue_portal_job: Upload,
+  get_submissions: ListChecks,
+  sync_submission_job: RefreshCcw,
+  read_file: FileSearch,
+  edit_file: Pencil,
+  set_upload_candidate: FileText,
   approve_submission: Send,
-  cancel_submission: XCircle,
   retry_submission: RotateCcw,
+  cancel_submission: XCircle,
 };
 
 function stringArg(input: unknown, key: string): string {
@@ -38,26 +44,27 @@ export function toolLabel(
 ): { active: string; done: string } {
   switch (toolName) {
     case "get_connection_status":
-      return {
-        active: "Checking portal connection…",
-        done: "Checked portal connection",
-      };
-    case "create_submission":
-      return { active: "Starting submission…", done: "Started submission" };
-    case "get_submission":
-      return { active: "Reading submission…", done: "Read submission" };
-    case "list_submissions":
-      return { active: "Listing submissions…", done: "Listed submissions" };
-    case "update_score": {
-      const name = stringArg(input, "studentName");
-      const object = name ? `${name}'s score` : "a score";
-      return {
-        active: `Updating ${object}…`,
-        done: `Updated ${object}`,
-      };
+      return { active: "Checking portal connection…", done: "Checked portal connection" };
+    case "check_wallet_balance":
+      return { active: "Checking wallet balance…", done: "Checked wallet balance" };
+    case "create_portal_job":
+      return { active: "Starting portal job…", done: "Started portal job" };
+    case "continue_portal_job":
+      return { active: "Continuing portal job…", done: "Continued portal job" };
+    case "get_submissions":
+      return { active: "Reading submissions…", done: "Read submissions" };
+    case "sync_submission_job":
+      return { active: "Syncing job status…", done: "Synced job status" };
+    case "read_file": {
+      const name = stringArg(input, "name") || "a file";
+      return { active: `Reading ${name}…`, done: `Read ${name}` };
     }
-    case "resolve_name_match":
-      return { active: "Fixing a name match…", done: "Fixed a name match" };
+    case "edit_file": {
+      const name = stringArg(input, "name") || "a file";
+      return { active: `Editing ${name}…`, done: `Edited ${name}` };
+    }
+    case "set_upload_candidate":
+      return { active: "Setting upload candidate…", done: "Set upload candidate" };
     case "approve_submission":
       return { active: "Approving submission…", done: "Approved submission" };
     case "cancel_submission":
