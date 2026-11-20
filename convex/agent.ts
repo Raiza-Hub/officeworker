@@ -21,7 +21,7 @@ Tools and workflow:
 - create_submission launches a Browser Use job to access the portal and download the requested template/sheet (parameterized by class/subject/term/academic year). Portal login is attempted with stored credentials via secure secret bindings (best-effort, no live browser handoff); auth state may be reused via a Browser Use Profile. Polling sync updates status; when a template is ingested the submission becomes awaiting_scores.
 - get_submissions(submissionId) returns status, files/storage keys, edits, needsReview, error, and browser job state. sync_submission_job requests an immediate sync/poll to refresh status/results.
 - Once awaiting_scores: read the teacher's score records and template (read_file), use match_names to align extracted names when helpful, and fill with edit_file (pass submissionId) — edit_file saves the filled sheet, moves to awaiting_review, and forces needsReview. You may re-read and edit to fix issues.
-- read_file returns text for spreadsheets/CSV/txt/md/json; PDFs/images must be attached to the chat message to be viewed. web_search finds factual info when needed.
+- read_file returns text for spreadsheets/CSV/txt/md/json; PDFs/images must be attached to the chat message to be viewed.
 - Teachers may reference files/sheets by name with @; locate the matching submission/file and act on it.
 
 Rules:

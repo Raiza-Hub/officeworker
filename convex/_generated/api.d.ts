@@ -25,7 +25,6 @@ import type * as portalAdapter from "../portalAdapter.js";
 import type * as r2 from "../r2.js";
 import type * as submissions from "../submissions.js";
 import type * as users from "../users.js";
-import type * as webSearch from "../webSearch.js";
 import type * as workspace from "../workspace.js";
 import type * as workspaceActions from "../workspaceActions.js";
 
@@ -53,7 +52,6 @@ declare const fullApi: ApiFromModules<{
   r2: typeof r2;
   submissions: typeof submissions;
   users: typeof users;
-  webSearch: typeof webSearch;
   workspace: typeof workspace;
   workspaceActions: typeof workspaceActions;
 }>;
