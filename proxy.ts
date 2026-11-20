@@ -7,7 +7,6 @@ import {
 const isLoginPage = createRouteMatcher(["/login"]);
 const isProtectedRoute = createRouteMatcher([
   "/create-workspace(.*)",
-  "/dashboard(.*)",
   "/documents(.*)",
   "/agent(.*)",
   "/profile(.*)",

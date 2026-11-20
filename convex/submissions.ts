@@ -1,10 +1,13 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { v } from "convex/values";
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import { ConvexError, v } from "convex/values";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 
 const statusValidator = v.union(
   v.literal("draft"),
   v.literal("preparing"),
+  v.literal("awaiting_scores"),
   v.literal("awaiting_review"),
   v.literal("login_failed"),
   v.literal("submitting"),
@@ -13,10 +16,71 @@ const statusValidator = v.union(
   v.literal("cancelled"),
 );
 
+const appliedEditValidator = v.object({
+  cell: v.string(),
+  value: v.union(v.string(), v.number(), v.null()),
+});
+
+const browserJobValidator = v.object({
+  provider: v.literal("browser_use"),
+  intent: v.string(),
+  phase: v.optional(v.string()),
+  status: v.optional(v.string()),
+  runId: v.optional(v.string()),
+  sessionId: v.optional(v.string()),
+  workspaceId: v.optional(v.string()),
+  profileId: v.optional(v.string()),
+  // v4 events cursor (`nextAfter/after`) is an integer.
+  lastEventCursor: v.optional(v.number()),
+  lastSyncedAt: v.optional(v.number()),
+  keepAliveUntil: v.optional(v.number()),
+  attempts: v.optional(v.number()),
+  lastError: v.optional(v.string()),
+  resultSummary: v.optional(v.string()),
+  syncDisabled: v.optional(v.boolean()),
+});
+
+const browserJobPatchValidator = v.object({
+  intent: v.optional(v.string()),
+  phase: v.optional(v.string()),
+  status: v.optional(v.string()),
+  runId: v.optional(v.string()),
+  sessionId: v.optional(v.string()),
+  workspaceId: v.optional(v.string()),
+  profileId: v.optional(v.string()),
+  // v4 events cursor (`nextAfter/after`) is an integer.
+  lastEventCursor: v.optional(v.number()),
+  lastSyncedAt: v.optional(v.number()),
+  keepAliveUntil: v.optional(v.number()),
+  attempts: v.optional(v.number()),
+  lastError: v.optional(v.string()),
+  resultSummary: v.optional(v.string()),
+  syncDisabled: v.optional(v.boolean()),
+});
+
+async function getOwnedSubmission(
+  ctx: QueryCtx,
+  submissionId: Id<"submissions">,
+  userId: Id<"users">,
+) {
+  const submission = await ctx.db.get(submissionId);
+  if (submission === null || submission.userId !== userId) return null;
+  return submission;
+}
+
+async function listOwnedSubmissions(ctx: QueryCtx, userId: Id<"users">) {
+  return await ctx.db
+    .query("submissions")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .order("desc")
+    .take(50);
+}
+
 export const createSubmissionDraft = internalMutation({
   args: {
     userId: v.id("users"),
-    portalKey: v.string(),
+    adapterId: v.string(),
+    portalUrl: v.string(),
     threadId: v.optional(v.string()),
     className: v.string(),
     subject: v.string(),
@@ -34,7 +98,7 @@ export const createSubmissionDraft = internalMutation({
       ...args,
       chargeAmount,
       status: "preparing",
-      runIds: {},
+      browserJob: undefined,
       files: { uploads: [] },
       createdAt: now,
       updatedAt: now,
@@ -48,22 +112,20 @@ export const createSubmissionDraft = internalMutation({
   },
 });
 
-// Idempotent worker-owned state transition. If `expectStatus` is provided the
-// patch only applies when the current status matches, so duplicate callback
-// deliveries (task retries) are safe.
 export const updateSubmission = internalMutation({
   args: {
     submissionId: v.id("submissions"),
     expectStatus: v.optional(v.string()),
     status: v.optional(statusValidator),
     error: v.optional(v.string()),
-    runIdKind: v.optional(v.union(v.literal("login"), v.literal("submit"))),
-    runId: v.optional(v.string()),
     templateKey: v.optional(v.string()),
     templateName: v.optional(v.string()),
     filledKey: v.optional(v.string()),
     filledName: v.optional(v.string()),
-    clearRunId: v.optional(v.union(v.literal("login"), v.literal("submit"))),
+    edits: v.optional(v.array(appliedEditValidator)),
+    needsReview: v.optional(v.boolean()),
+    browserJob: v.optional(browserJobValidator),
+    browserJobPatch: v.optional(browserJobPatchValidator),
     auditEvent: v.optional(v.string()),
     auditDetail: v.optional(v.any()),
   },
@@ -75,7 +137,6 @@ export const updateSubmission = internalMutation({
       args.expectStatus !== undefined &&
       submission.status !== args.expectStatus
     ) {
-      // Already transitioned (e.g. duplicate callback) — treat as no-op.
       return { applied: false as const };
     }
     if (submission.chargeStatus === "charged") {
@@ -88,10 +149,7 @@ export const updateSubmission = internalMutation({
       throw new Error("Upload cannot be completed without reserved wallet funds");
     }
 
-    if (
-      args.status === "done" &&
-      submission.chargeStatus === "reserved"
-    ) {
+    if (args.status === "done" && submission.chargeStatus === "reserved") {
       const wallet = await ctx.db
         .query("wallets")
         .withIndex("by_user", (q) => q.eq("userId", submission.userId))
@@ -114,7 +172,9 @@ export const updateSubmission = internalMutation({
       });
       patch.chargeStatus = "charged";
     } else if (
-      (args.status === "failed" || args.status === "login_failed" || args.status === "cancelled") &&
+      (args.status === "failed" ||
+        args.status === "login_failed" ||
+        args.status === "cancelled") &&
       submission.chargeStatus === "reserved"
     ) {
       const wallet = await ctx.db
@@ -129,8 +189,17 @@ export const updateSubmission = internalMutation({
       }
       patch.chargeStatus = "released";
     }
+
     if (args.status !== undefined) patch.status = args.status;
-    if (args.error !== undefined) patch.error = args.error;
+    if (args.error !== undefined) {
+      patch.error = args.error;
+    } else if (
+      args.status !== undefined &&
+      ["draft", "preparing", "awaiting_scores", "awaiting_review", "submitting", "done", "cancelled"].includes(args.status)
+    ) {
+      patch.error = undefined;
+    }
+
     if (args.templateKey !== undefined && args.templateName !== undefined) {
       patch.files = {
         ...submission.files,
@@ -143,17 +212,14 @@ export const updateSubmission = internalMutation({
         filled: { key: args.filledKey, originalName: args.filledName },
       };
     }
-    if (args.runIdKind !== undefined && args.runId !== undefined) {
-      patch.runIds = {
-        ...submission.runIds,
-        [args.runIdKind]: args.runId,
-      };
-    }
-    if (args.clearRunId !== undefined) {
-      patch.runIds = {
-        ...submission.runIds,
-        [args.clearRunId]: undefined,
-      };
+    if (args.edits !== undefined) patch.edits = args.edits;
+    if (args.needsReview !== undefined) patch.needsReview = args.needsReview;
+
+    if (args.browserJob !== undefined) {
+      patch.browserJob = args.browserJob;
+    } else if (args.browserJobPatch !== undefined) {
+      const current = submission.browserJob ?? { provider: "browser_use" as const, intent: "unknown" };
+      patch.browserJob = { ...current, ...args.browserJobPatch, provider: "browser_use" as const };
     }
 
     await ctx.db.patch(args.submissionId, patch);
@@ -189,95 +255,36 @@ export const reserveSubmissionCharge = internalMutation({
       .query("wallets")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .first();
-    const chargeAmount = submission.chargeAmount ?? (wallet?.plan === "pro" ? 1000 : 500);
+    const plan = wallet?.plan ?? "basic";
+    const chargeAmount = submission.chargeAmount ?? (plan === "pro" ? 1000 : 500);
     const available = Math.max(0, (wallet?.balance ?? 0) - (wallet?.reserved ?? 0));
-    if (!wallet || available < chargeAmount) {
-      throw new Error(
-        `Insufficient wallet balance. This upload costs ₦${chargeAmount.toLocaleString()}; add credits to continue.`,
-      );
+    if (!wallet || available <= 0) {
+      throw new ConvexError({
+        code: "WALLET_EMPTY",
+        context: "continue",
+        message: "You’ve run out of credits. Add credits to continue this chat.",
+      });
+    }
+    if (available < chargeAmount) {
+      throw new ConvexError({
+        code: "INSUFFICIENT_CREDITS",
+        message:
+          "You don’t have enough credits to complete this request. Add more credits to continue.",
+        required: chargeAmount,
+        available,
+        plan,
+      });
     }
     await ctx.db.patch(wallet._id, {
       reserved: wallet.reserved + chargeAmount,
       updatedAt: Date.now(),
     });
-    await ctx.db.patch(submission._id, { chargeAmount, chargeStatus: "reserved" });
-    return { amount: chargeAmount };
-  },
-});
-
-export const replaceScoreMappings = internalMutation({
-  args: {
-    submissionId: v.id("submissions"),
-    mappings: v.array(
-      v.object({
-        studentName: v.string(),
-        matchedName: v.optional(v.string()),
-        matchConfidence: v.optional(v.number()),
-        ca: v.optional(v.number()),
-        exam: v.optional(v.number()),
-        needsReview: v.boolean(),
-        source: v.union(v.literal("ai"), v.literal("manual"), v.literal("edited")),
-      }),
-    ),
-  },
-  handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("scoreMappings")
-      .withIndex("by_submission", (q) => q.eq("submissionId", args.submissionId))
-      .collect();
-    await Promise.all(
-      existing.map((row) => ctx.db.delete(row._id)),
-    );
-    await Promise.all(
-      args.mappings.map((mapping) =>
-        ctx.db.insert("scoreMappings", {
-          submissionId: args.submissionId,
-          ...mapping,
-        }),
-      ),
-    );
-    return args.mappings.length;
-  },
-});
-
-export const updateScoreMapping = internalMutation({
-  args: {
-    submissionId: v.id("submissions"),
-    studentName: v.string(),
-    ca: v.optional(v.number()),
-    exam: v.optional(v.number()),
-    matchedName: v.optional(v.string()),
-    needsReview: v.optional(v.boolean()),
-    source: v.optional(
-      v.union(v.literal("ai"), v.literal("manual"), v.literal("edited")),
-    ),
-  },
-  handler: async (ctx, args) => {
-    const rows = await ctx.db
-      .query("scoreMappings")
-      .withIndex("by_submission", (q) => q.eq("submissionId", args.submissionId))
-      .collect();
-    const row = rows.find(
-      (candidate) =>
-        candidate.studentName.toLowerCase() === args.studentName.toLowerCase(),
-    );
-    if (row === undefined) throw new Error("Student not found in submission");
-
-    const patch: Record<string, unknown> = {};
-    if (args.ca !== undefined) patch.ca = args.ca;
-    if (args.exam !== undefined) patch.exam = args.exam;
-    if (args.matchedName !== undefined) patch.matchedName = args.matchedName;
-    if (args.needsReview !== undefined) patch.needsReview = args.needsReview;
-    patch.source = args.source ?? "edited";
-    await ctx.db.patch(row._id, patch);
-
-    await ctx.db.insert("auditLog", {
-      submissionId: args.submissionId,
-      event: "score_edited",
-      detail: { ...args },
-      at: Date.now(),
+    await ctx.db.patch(submission._id, {
+      chargeAmount,
+      chargeStatus: "reserved",
+      needsReview: false,
     });
-    return row._id;
+    return { amount: chargeAmount };
   },
 });
 
@@ -286,26 +293,9 @@ export const getSubmission = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("Not authenticated");
-    const submission = await ctx.db.get(args.submissionId);
-    if (submission === null || submission.userId !== userId) {
-      throw new Error("Submission not found");
-    }
-    const mappings = await ctx.db
-      .query("scoreMappings")
-      .withIndex("by_submission", (q) => q.eq("submissionId", args.submissionId))
-      .collect();
-    return {
-      ...submission,
-      mappings: mappings.map((row) => ({
-        studentName: row.studentName,
-        matchedName: row.matchedName ?? null,
-        matchConfidence: row.matchConfidence ?? null,
-        ca: row.ca ?? null,
-        exam: row.exam ?? null,
-        needsReview: row.needsReview,
-        source: row.source,
-      })),
-    };
+    const submission = await getOwnedSubmission(ctx, args.submissionId, userId);
+    if (submission === null) throw new Error("Submission not found");
+    return submission;
   },
 });
 
@@ -314,44 +304,27 @@ export const listSubmissions = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("Not authenticated");
-    return await ctx.db
-      .query("submissions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(50);
+    return await listOwnedSubmissions(ctx, userId);
   },
 });
 
-// Worker-facing read (via task callback endpoint): submission + mappings.
-export const getSubmissionForTask = internalQuery({
+export const getSubmissionByUserId = internalQuery({
+  args: { submissionId: v.id("submissions"), userId: v.id("users") },
+  handler: async (ctx, args) => {
+    return await getOwnedSubmission(ctx, args.submissionId, args.userId);
+  },
+});
+
+export const listSubmissionsByUserId = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    return await listOwnedSubmissions(ctx, args.userId);
+  },
+});
+
+export const getSubmissionInternal = internalQuery({
   args: { submissionId: v.id("submissions") },
   handler: async (ctx, args) => {
-    const submission = await ctx.db.get(args.submissionId);
-    if (submission === null) return null;
-    const mappings = await ctx.db
-      .query("scoreMappings")
-      .withIndex("by_submission", (q) => q.eq("submissionId", args.submissionId))
-      .collect();
-    return {
-      _id: submission._id,
-      userId: submission.userId,
-      portalKey: submission.portalKey,
-      threadId: submission.threadId,
-      className: submission.className,
-      subject: submission.subject,
-      term: submission.term,
-      academicYear: submission.academicYear,
-      status: submission.status,
-      files: submission.files,
-      mappings: mappings.map((row) => ({
-        studentName: row.studentName,
-        matchedName: row.matchedName,
-        matchConfidence: row.matchConfidence,
-        ca: row.ca,
-        exam: row.exam,
-        needsReview: row.needsReview,
-        source: row.source,
-      })),
-    };
+    return await ctx.db.get(args.submissionId);
   },
 });

@@ -9,18 +9,23 @@
  */
 
 import type * as agent from "../agent.js";
+import type * as agentFiles from "../agentFiles.js";
+import type * as agentFilesDb from "../agentFilesDb.js";
 import type * as agentTools from "../agentTools.js";
 import type * as auth from "../auth.js";
 import type * as billing from "../billing.js";
+import type * as browserUse from "../browserUse.js";
+import type * as browserUseJobs from "../browserUseJobs.js";
 import type * as chat from "../chat.js";
 import type * as chatActions from "../chatActions.js";
 import type * as documents from "../documents.js";
 import type * as encryption from "../encryption.js";
 import type * as http from "../http.js";
+import type * as portalAdapter from "../portalAdapter.js";
 import type * as r2 from "../r2.js";
 import type * as submissions from "../submissions.js";
-import type * as triggerActions from "../triggerActions.js";
 import type * as users from "../users.js";
+import type * as webSearch from "../webSearch.js";
 import type * as workspace from "../workspace.js";
 import type * as workspaceActions from "../workspaceActions.js";
 
@@ -32,18 +37,23 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   agent: typeof agent;
+  agentFiles: typeof agentFiles;
+  agentFilesDb: typeof agentFilesDb;
   agentTools: typeof agentTools;
   auth: typeof auth;
   billing: typeof billing;
+  browserUse: typeof browserUse;
+  browserUseJobs: typeof browserUseJobs;
   chat: typeof chat;
   chatActions: typeof chatActions;
   documents: typeof documents;
   encryption: typeof encryption;
   http: typeof http;
+  portalAdapter: typeof portalAdapter;
   r2: typeof r2;
   submissions: typeof submissions;
-  triggerActions: typeof triggerActions;
   users: typeof users;
+  webSearch: typeof webSearch;
   workspace: typeof workspace;
   workspaceActions: typeof workspaceActions;
 }>;

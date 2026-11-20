@@ -1,7 +1,8 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { components } from "./_generated/api";
 import {
   abortStream,
@@ -28,7 +29,7 @@ async function authorizeThreadAccess(
   ctx: MutationCtx | QueryCtx,
   threadId: string,
   cacheScope?: string,
-): Promise<void> {
+): Promise<Id<"users">> {
   const userId = await getAuthUserId(ctx);
   if (userId === null) throw new Error("Not authenticated");
   if (cacheScope !== undefined && cacheScope !== userId) {
@@ -41,6 +42,7 @@ async function authorizeThreadAccess(
   if (activity === null || activity.userId !== userId) {
     throw new Error("Thread not found");
   }
+  return userId;
 }
 
 // New chat: create thread + save the first user message + schedule generation.
@@ -66,8 +68,13 @@ export const startThread = mutation({
       .query("wallets")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .first();
-    if (!wallet || wallet.balance <= 0) {
-      throw new Error("Your wallet is empty. Add credits in Billing to start a chat.");
+    const available = Math.max(0, (wallet?.balance ?? 0) - (wallet?.reserved ?? 0));
+    if (available <= 0) {
+      throw new ConvexError({
+        code: "WALLET_EMPTY",
+        context: "start",
+        message: "You’re out of credits. Add credits to start a chat.",
+      });
     }
     const prompt = args.prompt.trim();
     if (!prompt && (!args.attachments || args.attachments.length === 0)) {
@@ -126,10 +133,23 @@ export const sendMessage = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    await authorizeThreadAccess(ctx, args.threadId);
+    const userId = await authorizeThreadAccess(ctx, args.threadId);
     const prompt = args.prompt.trim();
     if (!prompt && (!args.attachments || args.attachments.length === 0)) {
       throw new Error("Message is empty");
+    }
+
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    const available = Math.max(0, (wallet?.balance ?? 0) - (wallet?.reserved ?? 0));
+    if (available <= 0) {
+      throw new ConvexError({
+        code: "WALLET_EMPTY",
+        context: "continue",
+        message: "You’ve run out of credits. Add credits to continue this chat.",
+      });
     }
 
     const { messageId } = await saveMessage(ctx, components.agent, {
@@ -155,6 +175,7 @@ export const sendMessage = mutation({
     if (activity !== null) {
       await ctx.db.patch(activity._id, { lastActivityAt: Date.now() });
     }
+
     await ctx.scheduler.runAfter(0, internal.chatActions.generateReply, {
       threadId: args.threadId,
       promptMessageId: messageId,

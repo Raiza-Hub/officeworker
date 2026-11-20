@@ -7,6 +7,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { components } from "./_generated/api";
 import ExcelJS from "exceljs";
+import Papa from "papaparse";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import {
   abortStream,
@@ -29,7 +30,7 @@ type Attachment = {
   size: number;
 };
 
-async function fetchObjectBytes(key: string): Promise<Uint8Array> {
+export async function fetchObjectBytes(key: string): Promise<Uint8Array> {
   const config = getR2Config();
   if (!config) throw new Error("R2 is not configured");
   const response = await createR2Client(config).send(
@@ -40,7 +41,21 @@ async function fetchObjectBytes(key: string): Promise<Uint8Array> {
   return new Uint8Array(await body.transformToByteArray());
 }
 
-async function spreadsheetToText(buffer: Buffer, name: string): Promise<string> {
+export async function spreadsheetToText(
+  buffer: Buffer,
+  name: string,
+): Promise<string> {
+  if (/\.(csv|tsv)$/i.test(name)) {
+    const lines: string[] = [`# File: ${name}`];
+    const parsed = Papa.parse<string[]>(buffer.toString("utf8"), {
+      skipEmptyLines: "greedy",
+    });
+    for (const row of parsed.data) {
+      const cells = (row ?? []).map((cell) => String(cell ?? ""));
+      if (cells.length > 0) lines.push(cells.join(" | "));
+    }
+    return lines.join("\n");
+  }
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(
     buffer as unknown as Parameters<typeof workbook.xlsx.load>[0],

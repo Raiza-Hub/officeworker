@@ -24,7 +24,7 @@ function WorkspaceAccessCard() {
 
     setIsPending(true);
     try {
-      await disconnectConnection({ portalKey: connectedPortal.portalKey });
+      await disconnectConnection({});
       toast.success("Workspace disconnected");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not disconnect workspace");

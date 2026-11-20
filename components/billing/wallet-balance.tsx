@@ -64,7 +64,7 @@ export function WalletBalance() {
           <div className="mt-1 min-h-5.5">
             {wallet ? (
               <p className="m-0 text-[13px] leading-5.5 font-[450] text-text-tertiary">
-                {naira(wallet.available)} available
+                {naira(wallet.available)}
               </p>
             ) : (
               <div className="h-3.5 w-48 animate-pulse rounded bg-secondary" />

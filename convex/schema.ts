@@ -2,6 +2,37 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
+const submissionStatus = v.union(
+  v.literal("draft"),
+  v.literal("preparing"),
+  v.literal("awaiting_scores"),
+  v.literal("awaiting_review"),
+  v.literal("login_failed"),
+  v.literal("submitting"),
+  v.literal("done"),
+  v.literal("failed"),
+  v.literal("cancelled"),
+);
+
+const browserJobValidator = v.object({
+  provider: v.literal("browser_use"),
+  intent: v.string(), // e.g. download, upload, login_bootstrap
+  phase: v.optional(v.string()),
+  status: v.optional(v.string()),
+  runId: v.optional(v.string()),
+  sessionId: v.optional(v.string()),
+  workspaceId: v.optional(v.string()),
+  profileId: v.optional(v.string()),
+  // v4 events cursor (`nextAfter/after`) is an integer.
+  lastEventCursor: v.optional(v.number()),
+  lastSyncedAt: v.optional(v.number()),
+  keepAliveUntil: v.optional(v.number()),
+  attempts: v.optional(v.number()),
+  lastError: v.optional(v.string()),
+  resultSummary: v.optional(v.string()),
+  syncDisabled: v.optional(v.boolean()),
+});
+
 export default defineSchema({
   ...authTables,
   wallets: defineTable({
@@ -29,6 +60,12 @@ export default defineSchema({
     amount: v.number(),
     status: v.union(v.literal("pending"), v.literal("paid"), v.literal("failed")),
     createdAt: v.number(),
+    paymentMethod: v.optional(v.string()),
+    gatewayStatus: v.optional(v.string()),
+    gatewayReference: v.optional(v.string()),
+    currency: v.optional(v.string()),
+    paidAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
   })
     .index("by_reference", ["reference"])
     .index("by_user_created", ["userId", "createdAt"]),
@@ -49,58 +86,50 @@ export default defineSchema({
       filterFields: ["ownerId", "kind", "sizeBucket", "status"],
     }),
 
-  // Portal registry — one entry per supported teacher portal (DiPER first).
-  portals: defineTable({
-    key: v.string(),
-    name: v.string(),
-    baseUrl: v.string(),
-    adapterId: v.string(),
-  }).index("by_key", ["key"]),
-
-  // Teacher portal credentials. `ciphertext` = base64(iv || encrypted || authTag)
-  // AES-256-GCM, key held in ENCRYPTION_KEY env var — never in the DB.
+  // Teacher portal connection (generic, any portal URL/account).
+  // `ciphertext` = encrypted portal password (AES-256-GCM), key in ENCRYPTION_KEY.
+  // Browser automation login reuse is handled via Browser Use Cloud Profile
+  // (`browserUseProfileId`) and per-run secret bindings (best-effort login, no live HITL);
+  // portal password is not transmitted to the agent.
   workspaceConnections: defineTable({
     userId: v.id("users"),
-    portalKey: v.string(),
+    adapterId: v.string(),
     portalUrl: v.string(),
     portalEmail: v.string(),
     ciphertext: v.string(),
     status: v.union(v.literal("connected"), v.literal("error")),
+    browserUseProfileId: v.optional(v.string()),
+    browserUseProfileStatus: v.optional(
+      v.union(v.literal("unknown"), v.literal("ready"), v.literal("needs_login")),
+    ),
     lastErrorAt: v.optional(v.number()),
     lastError: v.optional(v.string()),
-  })
-    .index("by_user", ["userId"])
-    .index("by_user_portal", ["userId", "portalKey"]),
+  }).index("by_user", ["userId"]),
 
-  // A term-sheet submission job. `files.template.originalName` and
-  // `files.filled.originalName` preserve the portal's own filename.
   submissions: defineTable({
     userId: v.id("users"),
-    portalKey: v.string(),
+    adapterId: v.string(),
+    portalUrl: v.string(),
     threadId: v.optional(v.string()),
     className: v.string(),
     subject: v.string(),
     term: v.string(),
     academicYear: v.string(),
-    status: v.union(
-      v.literal("draft"),
-      v.literal("preparing"),
-      v.literal("awaiting_review"),
-      v.literal("login_failed"),
-      v.literal("submitting"),
-      v.literal("done"),
-      v.literal("failed"),
-      v.literal("cancelled"),
-    ),
+    status: submissionStatus,
     chargeAmount: v.optional(v.number()),
     chargeStatus: v.optional(
       v.union(v.literal("reserved"), v.literal("charged"), v.literal("released")),
     ),
-    runIds: v.object({
-      login: v.optional(v.string()),
-      prepare: v.optional(v.array(v.string())),
-      submit: v.optional(v.string()),
-    }),
+    edits: v.optional(
+      v.array(
+        v.object({
+          cell: v.string(),
+          value: v.union(v.string(), v.number(), v.null()),
+        }),
+      ),
+    ),
+    needsReview: v.optional(v.boolean()),
+    browserJob: v.optional(browserJobValidator),
     error: v.optional(v.string()),
     files: v.object({
       uploads: v.array(
@@ -124,19 +153,6 @@ export default defineSchema({
     .index("by_user_status", ["userId", "status"])
     .index("by_thread", ["threadId"]),
 
-  // Extracted/matched scores. Only raw CA and EXAM are stored — totals are
-  // computed in memory at render/fill time, never persisted.
-  scoreMappings: defineTable({
-    submissionId: v.id("submissions"),
-    studentName: v.string(),
-    matchedName: v.optional(v.string()),
-    matchConfidence: v.optional(v.number()),
-    ca: v.optional(v.number()),
-    exam: v.optional(v.number()),
-    needsReview: v.boolean(),
-    source: v.union(v.literal("ai"), v.literal("manual"), v.literal("edited")),
-  }).index("by_submission", ["submissionId"]),
-
   auditLog: defineTable({
     submissionId: v.id("submissions"),
     event: v.string(),
@@ -146,8 +162,6 @@ export default defineSchema({
     .index("by_submission", ["submissionId"])
     .index("by_time", ["at"]),
 
-  // One row per user turn; powers the sidebar chat-history list ordered by
-  // recent activity (documented @convex-dev/agent pattern).
   threadActivity: defineTable({
     userId: v.id("users"),
     threadId: v.string(),
@@ -157,9 +171,6 @@ export default defineSchema({
     .index("by_thread", ["threadId"])
     .index("by_user_activity", ["userId", "lastActivityAt"]),
 
-  // Files attached to a chat message (R2 key only; bytes live in R2). Joined
-  // onto UIMessages in listThreadMessages — the agent component's metadata
-  // validator has no arbitrary fields, so this table is the source of truth.
   messageAttachments: defineTable({
     messageId: v.string(),
     threadId: v.string(),

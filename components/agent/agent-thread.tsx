@@ -99,8 +99,9 @@ export function AgentThread({ threadId }: { threadId: string }) {
   );
 
   useEffect(() => {
-    setTitle(summary?.title ?? null);
-  }, [summary?.title, setTitle]);
+    if (summary === undefined) return;
+    setTitle(summary.title ?? null);
+  }, [summary, setTitle]);
 
   const { pending, clearPending, navigation } = usePendingReply();
   const threadPending = pending?.threadId === threadId ? pending : null;

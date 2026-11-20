@@ -3,12 +3,12 @@
 import { createContext, useContext } from "react";
 
 type ThreadTitleValue = {
-  title: string | null;
-  setTitle: (title: string | null) => void;
+  title: string | null | undefined;
+  setTitle: (title: string | null | undefined) => void;
 };
 
 const ThreadTitleContext = createContext<ThreadTitleValue>({
-  title: null,
+  title: undefined,
   setTitle: () => undefined,
 });
 
