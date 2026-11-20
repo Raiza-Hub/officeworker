@@ -145,8 +145,9 @@ export function AgentThread({ threadId }: { threadId: string }) {
     if (messages.status === "CanLoadMore") messages.loadMore(30);
   }, [messages]);
 
+  type TurnTiming = NonNullable<typeof turnTimings>[number];
   const timingByPromptId = useMemo(
-    () => new Map((turnTimings ?? []).map((turn) => [turn.promptMessageId, turn])),
+    () => new Map<string, TurnTiming>((turnTimings ?? []).map((turn) => [turn.promptMessageId, turn as TurnTiming])),
     [turnTimings],
   );
 

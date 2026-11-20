@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as admin from "../admin.js";
 import type * as agent from "../agent.js";
 import type * as agentFiles from "../agentFiles.js";
 import type * as agentFilesDb from "../agentFilesDb.js";
@@ -35,6 +36,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  admin: typeof admin;
   agent: typeof agent;
   agentFiles: typeof agentFiles;
   agentFilesDb: typeof agentFilesDb;

@@ -1,6 +1,5 @@
 "use node";
 
-import Fuse from "fuse.js";
 import ExcelJS from "exceljs";
 import Papa from "papaparse";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -51,86 +50,21 @@ function truncate(text: string, label: string): string {
   );
 }
 
-// Detects the NAME/CA/EXAM header grid (same heuristics as the trigger-side
-// template loader) and returns the roster plus per-row cell values.
-async function detectGrid(bytes: Uint8Array): Promise<{
-  headerRow: number;
-  rosterColumn: number;
-  caColumn: number;
-  examColumn: number;
-  totalColumn: number | null;
-  roster: string[];
-  rowValues: Array<{ name: string; ca: string | null; exam: string | null }>;
-} | null> {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(
-    Buffer.from(bytes) as unknown as Parameters<typeof workbook.xlsx.load>[0],
-  );
-  const sheet = workbook.worksheets[0];
-  if (!sheet) return null;
-
-  let headerRow = 0;
-  let rosterColumn = 0;
-  let caColumn = 0;
-  let examColumn = 0;
-  let totalColumn: number | null = null;
-
-  for (let r = 1; r <= Math.min(sheet.rowCount, 10); r++) {
-    const row = sheet.getRow(r);
-    for (let c = 1; c <= row.cellCount; c++) {
-      const value = row.getCell(c).value;
-      const text = typeof value === "string" ? value.trim().toLowerCase() : "";
-      if (!rosterColumn && (text === "name" || text.includes("student"))) rosterColumn = c;
-      if (!caColumn && (text === "ca" || text.includes("continuous"))) caColumn = c;
-      if (!examColumn && (text === "exam" || text.includes("examination"))) examColumn = c;
-      if (text === "total" || text.includes("total")) totalColumn = c;
-    }
-    if (rosterColumn && caColumn && examColumn) {
-      headerRow = r;
-      break;
-    }
-  }
-  if (!headerRow) return null;
-
-  const roster: string[] = [];
-  const rowValues: Array<{ name: string; ca: string | null; exam: string | null }> = [];
-  for (let r = headerRow + 1; r <= sheet.rowCount; r++) {
-    const row = sheet.getRow(r);
-    const rosterCell = row.getCell(rosterColumn).value;
-    const name = typeof rosterCell === "string" ? rosterCell.trim() : "";
-    if (!name) continue;
-    roster.push(name);
-    const cellText = (column: number): string | null => {
-      if (!column) return null;
-      const value = row.getCell(column).value;
-      if (value === null || value === undefined || value === "") return null;
-      if (typeof value === "object" && "result" in value) {
-        return value.result === null || value.result === undefined
-          ? null
-          : String(value.result);
-      }
-      return String(value);
-    };
-    rowValues.push({ name, ca: cellText(caColumn), exam: cellText(examColumn) });
-  }
-  return { headerRow, rosterColumn, caColumn, examColumn, totalColumn, roster, rowValues };
-}
-
 function readErrorMessage(name: string): string {
   if (/\.pdf$/i.test(name)) {
-    return `${name} is a PDF — this tool can only return text. Ask the teacher to attach it to a chat message so it can be viewed directly.`;
+    return `${name} is a PDF — PDFs/images attached in chat are understood directly by the assistant. If this file is not in the chat, ask the teacher to attach it or export a readable form.`;
   }
   if (/\.(png|jpe?g|webp|heic|gif)$/i.test(name)) {
-    return `${name} is an image — this tool can only return text. Ask the teacher to attach it to a chat message so it can be viewed directly.`;
+    return `${name} is an image — images attached in chat are understood directly by the assistant. If this file is not in the chat, ask the teacher to attach it or export a readable form.`;
   }
   if (/\.(docx?|pptx?|odt|rtf)$/i.test(name)) {
-    return `${name} is a document format that cannot be read as text yet. Ask the teacher to attach it to a chat message, or export it to CSV/XLSX first.`;
+    return `${name} is a document format that cannot be parsed as text here. Ask the teacher to attach it to chat if viewable, or export it to a readable form (CSV/XLSX/TXT).`;
   }
-  return `${name} is not a readable text, spreadsheet, or CSV file.`;
+  return `${name} is not a parseable/readable text or spreadsheet file. Ask the teacher to provide a readable export if needed; do not guess.`;
 }
 
-// read_file: any workspace spreadsheet/CSV/text file → generic text. No
-// schema: the agent reasons over the raw content per the user's prompt.
+// read_file: parseable workspace files → text for the agent to understand/act on.
+// PDFs/images should be attached in chat for direct multimodal understanding.
 export const readFileAction = internalAction({
   args: { key: v.string(), name: v.optional(v.string()), userId: v.id("users") },
   handler: async (ctx, args): Promise<string> => {
@@ -156,11 +90,10 @@ export const readFileAction = internalAction({
   },
 });
 
-// edit_file: generic A1-notation cell edits on xlsx/csv. With a submissionId
-// the result becomes the submission's filled sheet — needsReview is forced
-// true and the status moves to awaiting_review; nothing uploads to the
-// portal until the teacher approves. Without one, a versioned copy is
-// written next to the original.
+// edit_file: generic A1-notation cell edits on xlsx/csv.
+// With a submissionId the result becomes the submission's upload candidate and
+// the submission moves to awaiting_review — nothing uploads to the portal until
+// the teacher explicitly approves. Without one, a versioned copy is written.
 export const editFileAction = internalAction({
   args: {
     key: v.string(),
@@ -204,8 +137,7 @@ export const editFileAction = internalAction({
     }
 
     const bytes = await r2Get(args.key);
-    const submissionEdit =
-      args.submissionId !== undefined || owner.kind === "submission";
+    const submissionEdit = args.submissionId !== undefined;
 
     if (isXlsx) {
       const workbook = new ExcelJS.Workbook();
@@ -225,28 +157,30 @@ export const editFileAction = internalAction({
       const written = new Uint8Array(await workbook.xlsx.writeBuffer());
 
       if (submissionEdit) {
-        const submissionId =
-          args.submissionId ?? (owner.kind === "submission" ? owner.submissionId : "");
-        const filledKey = `submissions/${submissionId}/filled/${name}`;
-        await r2Put(filledKey, written, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        const submissionId = args.submissionId as Id<"submissions">;
+        const candidateKey = `submissions/${submissionId}/candidates/${Date.now()}-${name}`;
+        await r2Put(
+          candidateKey,
+          written,
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        );
         await ctx.runMutation(internal.submissions.updateSubmission, {
-          submissionId: submissionId as Id<"submissions">,
+          submissionId,
           status: "awaiting_review",
-          needsReview: true,
           edits: args.edits,
-          filledKey,
-          filledName: name,
-          auditEvent: "sheet_edited",
-          auditDetail: { edits: args.edits },
+          uploadCandidate: { key: candidateKey, name, size: written.length },
+          auditEvent: "upload_candidate_prepared",
+          auditDetail: { edits: args.edits, key: candidateKey, name },
         });
-        return `Applied ${args.edits.length} cell edit(s) to ${name} and saved the filled sheet. The submission is now awaiting the teacher's review — do not upload until they explicitly approve.`;
+        return `Applied ${args.edits.length} cell edit(s) to ${name} and saved it as the upload candidate. The submission is awaiting explicit teacher approval — do not upload until they approve.`;
       }
 
       const dot = name.lastIndexOf(".");
       const stem = dot > 0 ? name.slice(0, dot) : name;
       const ext = dot > 0 ? name.slice(dot) : "";
       const editedName = `${stem}-edited-${Date.now()}${ext}`;
-      const newKey = `${args.key.split("/").slice(0, -1).join("/")}/${editedName}`.replace(/^\/+/, "");
+      const baseDir = args.key.split("/").slice(0, -1).join("/");
+      const newKey = `${baseDir}/${editedName}`.replace(/^\/+/, "");
       await r2Put(
         newKey,
         written,
@@ -264,7 +198,7 @@ export const editFileAction = internalAction({
       return `Applied ${args.edits.length} cell edit(s). Saved as a new copy: ${editedName} (key: ${newKey}). The original file is unchanged.`;
     }
 
-    // CSV path: parse → apply → stringify.
+    // CSV/TSV path: parse → apply → stringify.
     const parsed = Papa.parse<string[]>(Buffer.from(bytes).toString("utf8"), {
       skipEmptyLines: false,
     });
@@ -285,13 +219,26 @@ export const editFileAction = internalAction({
     const written = new TextEncoder().encode(csvText);
 
     if (submissionEdit) {
-      return "Submission sheets must be .xlsx files — this CSV cannot be used as a filled term sheet.";
+      const submissionId = args.submissionId as Id<"submissions">;
+      const candidateKey = `submissions/${submissionId}/candidates/${Date.now()}-${name}`;
+      await r2Put(candidateKey, written, "text/csv");
+      await ctx.runMutation(internal.submissions.updateSubmission, {
+        submissionId,
+        status: "awaiting_review",
+        edits: args.edits,
+        uploadCandidate: { key: candidateKey, name, size: written.length },
+        auditEvent: "upload_candidate_prepared",
+        auditDetail: { edits: args.edits, key: candidateKey, name },
+      });
+      return `Applied ${args.edits.length} cell edit(s) to ${name} and saved it as the upload candidate. The submission is awaiting explicit teacher approval — do not upload until they approve.`;
     }
+
     const dot = name.lastIndexOf(".");
     const stem = dot > 0 ? name.slice(0, dot) : name;
     const ext = dot > 0 ? name.slice(dot) : "";
     const editedName = `${stem}-edited-${Date.now()}${ext}`;
-    const newKey = `${args.key.split("/").slice(0, -1).join("/")}/${editedName}`.replace(/^\/+/, "");
+    const baseDir = args.key.split("/").slice(0, -1).join("/");
+    const newKey = `${baseDir}/${editedName}`.replace(/^\/+/, "");
     await r2Put(newKey, written, "text/csv");
     if (owner.kind === "document") {
       await ctx.runMutation(internal.agentFilesDb.registerEditedDocument, {
@@ -306,68 +253,37 @@ export const editFileAction = internalAction({
   },
 });
 
-// match_names: fuzzy name matching backed by Fuse.js. The agent constructs
-// the Fuse configuration itself (options below are the JSON-safe subset) and
-// re-adjusts based on the returned scores. Always returns scores.
-export const matchNamesAction = internalAction({
+export const setUploadCandidateAction = internalAction({
   args: {
-    queries: v.array(v.string()),
-    roster: v.optional(v.array(v.string())),
-    submissionId: v.optional(v.string()),
+    submissionId: v.string(),
+    key: v.string(),
     userId: v.id("users"),
-    options: v.optional(
-      v.object({
-        threshold: v.optional(v.number()),
-        ignoreLocation: v.optional(v.boolean()),
-        distance: v.optional(v.number()),
-        isCaseSensitive: v.optional(v.boolean()),
-        ignoreDiacritics: v.optional(v.boolean()),
-        minMatchCharLength: v.optional(v.number()),
-        findAllMatches: v.optional(v.boolean()),
-        includeMatches: v.optional(v.boolean()),
-        shouldSort: v.optional(v.boolean()),
-        useExtendedSearch: v.optional(v.boolean()),
-        useTokenSearch: v.optional(v.boolean()),
-        tokenMatch: v.optional(v.union(v.literal("any"), v.literal("all"))),
-        ignoreFieldNorm: v.optional(v.boolean()),
-        fieldNormWeight: v.optional(v.number()),
-        location: v.optional(v.number()),
-      }),
-    ),
+    name: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<string> => {
-    let roster = args.roster;
-    if ((roster === undefined || roster.length === 0) && args.submissionId !== undefined) {
-      const templateKey = await ctx.runQuery(internal.agentFilesDb.getSubmissionTemplateKey, {
-        submissionId: args.submissionId,
-        userId: args.userId,
-      });
-      if (templateKey === null) {
-        return "No template on this submission yet — the roster is not available. Use create_submission first, or pass the roster explicitly.";
-      }
-      const bytes = await r2Get(templateKey);
-      const grid = await detectGrid(bytes);
-      roster = grid?.roster ?? [];
-    }
-    if (roster === undefined || roster.length === 0) {
-      return "No roster to match against — pass `roster` explicitly or use a submission that has a template.";
-    }
-
-    const fuse = new Fuse(roster, {
-      ...args.options,
-      includeScore: true,
-      shouldSort: args.options?.shouldSort ?? true,
+    const state = await ctx.runQuery(internal.agentFilesDb.getSubmissionState, {
+      submissionId: args.submissionId,
+      userId: args.userId,
     });
-    const results = args.queries.map((query) => ({
-      query,
-      matches: fuse.search(query)
-        .slice(0, 5)
-        .map((hit) => ({
-          name: hit.item,
-          score: hit.score ?? 1,
-          confidence: Math.round((1 - (hit.score ?? 1)) * 100) / 100,
-        })),
-    }));
-    return JSON.stringify({ results });
+    if (!state) return "Submission not found in your workspace.";
+    const owner = (await ctx.runQuery(internal.agentFilesDb.resolveFileOwnership, {
+      key: args.key,
+      userId: args.userId,
+    })) as FileOwner;
+    if (owner === null) {
+      return "Access denied: that file is not in your workspace.";
+    }
+    if (owner.kind === "submission" && owner.submissionId !== args.submissionId) {
+      return "That file belongs to a different submission. Choose a file from this submission or your workspace documents.";
+    }
+    const name = baseName(args.key, args.name);
+    await ctx.runMutation(internal.submissions.updateSubmission, {
+      submissionId: args.submissionId as Id<"submissions">,
+      status: "awaiting_review",
+      uploadCandidate: { key: args.key, name },
+      auditEvent: "upload_candidate_set",
+      auditDetail: { key: args.key, name },
+    });
+    return `Upload candidate set to ${name} (${args.key}). The submission is awaiting explicit teacher approval — do not upload until they approve.`;
   },
 });

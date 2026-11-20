@@ -32,12 +32,16 @@ export const resolveFileOwnership = internalQuery({
   },
 });
 
-export const getSubmissionTemplateKey = internalQuery({
+export const getSubmissionState = internalQuery({
   args: { submissionId: v.string(), userId: v.id("users") },
   handler: async (ctx, args) => {
     const submission = await ctx.db.get(args.submissionId as Id<"submissions">);
     if (submission === null || submission.userId !== args.userId) return null;
-    return submission.files.template?.key ?? null;
+    return {
+      status: submission.status,
+      files: submission.files,
+      browserJob: submission.browserJob ?? null,
+    };
   },
 });
 

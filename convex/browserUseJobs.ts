@@ -1,7 +1,8 @@
 "use node";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { v } from "convex/values";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
@@ -18,17 +19,16 @@ import {
   getRunStatus,
   isSuccessRunStatus,
   isTerminalRunStatus,
-  listAllWorkspaceFiles,
-  queueSessionMessage,
   sleep,
-  DOWNLOAD_URL_TOLERANCE_MS,
   RUN_KEEP_ALIVE_SECONDS,
   POLL_INTERVAL_MS,
+  DOWNLOAD_URL_TOLERANCE_MS,
   type SecretBinding,
 } from "./browserUse";
 
 const URL_TOLERANCE_MS = DOWNLOAD_URL_TOLERANCE_MS;
 const UPLOAD_PUT_TIMEOUT_MS = 120_000;
+const MAX_INGEST_FILES = 8;
 
 function now() {
   return Date.now();
@@ -39,8 +39,23 @@ function sanitizeFileName(name: string): string {
   return base.replace(/[^a-zA-Z0-9._-]+/g, "_") || "file";
 }
 
-function isSpreadsheetPath(path: string): boolean {
-  return /\.(xlsx|xls|csv)$/i.test(path);
+function isLikelyRelevantPath(path: string): boolean {
+  return /\.(xlsx|xls|csv|pdf|txt|md|json|log|png|jpe?g|webp)$/i.test(path);
+}
+
+function guessContentType(path: string): string {
+  if (/\.xlsx$/i.test(path)) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  if (/\.xls$/i.test(path)) return "application/vnd.ms-excel";
+  if (/\.csv$/i.test(path)) return "text/csv";
+  if (/\.pdf$/i.test(path)) return "application/pdf";
+  if (/\.txt$/i.test(path)) return "text/plain";
+  if (/\.md$/i.test(path)) return "text/markdown";
+  if (/\.json$/i.test(path)) return "application/json";
+  if (/\.log$/i.test(path)) return "text/plain";
+  if (/\.png$/i.test(path)) return "image/png";
+  if (/\.jpe?g$/i.test(path)) return "image/jpeg";
+  if (/\.webp$/i.test(path)) return "image/webp";
+  return "application/octet-stream";
 }
 
 async function putToR2(key: string, bytes: Uint8Array, contentType?: string) {
@@ -56,12 +71,13 @@ async function putToR2(key: string, bytes: Uint8Array, contentType?: string) {
   );
 }
 
-function guessContentType(path: string): string {
-  if (/\.xlsx$/i.test(path)) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  if (/\.xls$/i.test(path)) return "application/vnd.ms-excel";
-  if (/\.csv$/i.test(path)) return "text/csv";
-  if (/\.pdf$/i.test(path)) return "application/pdf";
-  return "application/octet-stream";
+async function getFromR2(key: string): Promise<Uint8Array> {
+  const config = getR2Config();
+  if (!config) throw new Error("R2 is not configured");
+  const obj = await createR2Client(config).send(new GetObjectCommand({ Bucket: config.bucket, Key: key }));
+  const body = obj.Body;
+  if (!body) throw new Error(`Missing R2 object: ${key}`);
+  return new Uint8Array(await body.transformToByteArray());
 }
 
 function toEventCursor(v: unknown): number | undefined {
@@ -79,8 +95,6 @@ async function tolerantUploadToWorkspace(args: {
   bytes: Uint8Array;
   contentType: string;
 }) {
-  // Request fresh presigned upload URL(s) and PUT bytes, tolerating slow networks
-  // and short-lived presigned URL expiry for ~5 minutes (re-request URL on failure).
   const deadline = Date.now() + URL_TOLERANCE_MS;
   let lastErr: unknown = null;
   const encodedName = sanitizeFileName(args.filename);
@@ -154,37 +168,312 @@ async function getPortalSecretBindings(
   ];
 }
 
-function buildDownloadTask(submission: Doc<"submissions">, portalUrl: string) {
-  const host = portalHostname(portalUrl);
-  return [
-    `You are automating a teacher portal workflow for a term sheet.`,
-    `Portal URL: ${portalUrl}`,
-    `Target: class="${submission.className}", subject="${submission.subject}", term="${submission.term}", academicYear="${submission.academicYear}".`,
-    `Authentication: if sign-in is required, use the provided secret bindings on ${host} — type the secret alias "portal_email" into the email/username field and "portal_password" into the password field, then submit the login form. Do not ask for credentials or expose secret values.`,
-    `Goal: navigate to the correct section and download the official term sheet/template or score sheet for the requested class/subject/term/academic year.`,
-    `Save any downloaded spreadsheet files into the workspace (prefer paths under uploads/ or outputs/ with clear filenames).`,
-    `If you cannot complete the task (e.g. login fails, credentials rejected, CAPTCHA/MFA/OTP/SSO/device approval required, required page/option not found, or repeated errors), stop and report the exact blocking reason and the page/step you reached. Do not ask the user to take action in a live browser.`,
-    `When finished, report exactly which file(s) were downloaded (filenames/paths) and any important notes. If you cannot find or download the requested sheet, explain why.`,
-  ].join("\n");
-}
-
-function buildUploadTask(submission: Doc<"submissions">, portalUrl: string, filledName: string) {
-  const host = portalHostname(portalUrl);
-  return [
-    `You are automating a teacher portal workflow for a term sheet upload.`,
-    `Portal URL: ${portalUrl}`,
-    `Target: class="${submission.className}", subject="${submission.subject}", term="${submission.term}", academicYear="${submission.academicYear}".`,
-    `Authentication: if sign-in is required, use the provided secret bindings on ${host} — type the secret alias "portal_email" into the email/username field and "portal_password" into the password field, then submit the login form. Do not ask for credentials or expose secret values.`,
-    `Goal: locate the upload/submit area for the requested term sheet and upload the prepared filled file named "${filledName}" from the workspace (look under uploads/). Submit/confirm if required by the portal flow.`,
-    `If you cannot complete the task (e.g. login fails, credentials rejected, CAPTCHA/MFA/OTP/SSO/device approval required, upload option not found, or repeated errors), stop and report the exact blocking reason and the page/step you reached. Do not ask the user to take action in a live browser.`,
-    `After submission, report the outcome clearly (success confirmation, reference/receipt if shown, or any error). Save any confirmation/receipt file to the workspace if possible.`,
-  ].join("\n");
-}
-
 function truncateError(text: unknown, fallback: string): string {
   const raw = typeof text === "string" ? text.trim() : "";
   if (!raw) return fallback;
   return raw.length > 500 ? `${raw.slice(0, 497)}...` : raw;
+}
+
+function formatArtifactList(submission: Doc<"submissions">): string {
+  const outputs = submission.files.outputs ?? [];
+  const inputs = submission.files.inputs ?? [];
+  const lines: string[] = [];
+  if (inputs.length > 0) {
+    lines.push("Known input files (R2): " + inputs.map((f) => `${f.name} [key:${f.key}]`).join(", "));
+  }
+  if (outputs.length > 0) {
+    lines.push("Known ingested outputs (R2): " + outputs.map((f) => `${f.name} [key:${f.key}]`).join(", "));
+  }
+  if (submission.files.uploadCandidate) {
+    const c = submission.files.uploadCandidate;
+    lines.push(`Current upload candidate: ${c.name} [key:${c.key}]`);
+  }
+  return lines.length ? lines.join("\n") : "No known ingested artifacts yet.";
+}
+
+function buildPortalTask(submission: Doc<"submissions">, portalUrl: string, intent: string, extraInstruction?: string) {
+  const host = portalHostname(portalUrl);
+  const base = [
+    `You are automating a teacher portal workflow using Browser Use Cloud.`,
+    `Portal URL: ${portalUrl}`,
+    `Teacher goal: ${submission.goal}`,
+    formatArtifactList(submission),
+    `Authentication: if sign-in is required, use the provided secret bindings on ${host} — type the secret alias "portal_email" into the email/username field and "portal_password" into the password field, then submit the login form. Do not ask for credentials or expose secret values.`,
+    intent === "upload"
+      ? `Upload intent: locate the correct upload/submit area for the goal and upload the prepared file from the workspace (look under uploads/). Submit/confirm if the portal flow requires it.`
+      : `Task intent: complete the goal in the portal as requested. Save any relevant produced/downloaded files into the workspace (prefer uploads/ or outputs/ with clear filenames).`,
+    `Workspace files persist for this workspace; files uploaded to this workspace are restored under uploads/.`,
+    `If you cannot complete the task (e.g. login fails, credentials rejected, CAPTCHA/MFA/OTP/SSO/device approval required, required page/option/file not found, ambiguous target, or repeated errors), stop and report the exact blocking reason and the page/step you reached. Do not ask the user to take action in a live browser.`,
+    `When finished, report clearly what you did, which files (filenames/paths) were downloaded/produced/uploaded, and any ambiguity or missing information that requires the teacher's confirmation.`,
+  ];
+  if (extraInstruction?.trim()) base.push(`Additional instruction: ${extraInstruction.trim()}`);
+  return base.join("\n");
+}
+
+async function stageInputsToWorkspace(
+  ctx: any,
+  submission: Doc<"submissions">,
+  workspaceId: string,
+  keys?: string[],
+) {
+  const wanted = new Set((keys ?? []).filter(Boolean));
+  const candidates = (submission.files.inputs ?? []).filter((f) => wanted.size === 0 || wanted.has(f.key));
+  const staged: string[] = [];
+  for (const f of candidates) {
+    const bytes = await getFromR2(f.key);
+    const uploaded = await tolerantUploadToWorkspace({
+      workspaceId,
+      filename: f.name || sanitizeFileName(f.key),
+      bytes,
+      contentType: guessContentType(f.name || f.key),
+    });
+    staged.push(uploaded.filename);
+  }
+  if (staged.length > 0) {
+    await ctx.runMutation(internal.submissions.updateSubmission, {
+      submissionId: submission._id,
+      browserJobPatch: { intent: submission.browserJob?.intent ?? "portal_task", workspaceId },
+      auditEvent: "browser_use_inputs_staged",
+      auditDetail: { workspaceId, files: staged },
+    });
+  }
+  return staged;
+}
+
+async function ensureConnectionProfileForUser(
+  ctx: any,
+  userId: Id<"users">,
+): Promise<{ profileId: string; created: boolean }> {
+  const conn = await ctx.runQuery(internal.workspace.getConnectionInternal, { userId });
+  if (!conn) throw new Error("No workspace connection found");
+  if (conn.browserUseProfileId) return { profileId: conn.browserUseProfileId, created: false };
+  const created: any = await createProfile(`officeworker-${String(userId)}`);
+  const profileId = String(created?.id ?? created?.profileId ?? created?.profile_id ?? "");
+  if (!profileId) throw new Error("Failed to create Browser Use profile");
+  await ctx.runMutation(internal.workspace.setBrowserUseProfile, {
+    userId,
+    browserUseProfileId: profileId,
+    browserUseProfileStatus: "unknown",
+  });
+  return { profileId, created: true };
+}
+
+export const ensureConnectionProfile = internalAction({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args): Promise<{ profileId: string; created: boolean }> => {
+    return await ensureConnectionProfileForUser(ctx, args.userId);
+  },
+});
+
+async function startRunForSubmission(
+  ctx: any,
+  submissionId: Id<"submissions">,
+  intent: string,
+  extraInstruction?: string,
+  stageInputKeys?: string[],
+) {
+  const submission: Doc<"submissions"> | null = await ctx.runQuery(internal.submissions.getSubmissionInternal, { submissionId });
+  if (!submission) throw new Error("Submission not found");
+  const conn = await ctx.runQuery(internal.workspace.getConnectionInternal, { userId: submission.userId });
+  if (!conn) throw new Error("No workspace connection found");
+
+  let profileId = conn.browserUseProfileId as string | undefined;
+  if (!profileId) {
+    const ensured = await ensureConnectionProfileForUser(ctx, submission.userId);
+    profileId = ensured.profileId;
+  }
+
+  let workspaceId = submission.browserJob?.workspaceId as string | undefined;
+  if (!workspaceId) {
+    const ws: any = await createWorkspace(`sub-${String(submissionId)}`);
+    workspaceId = String(ws?.id ?? ws?.workspaceId ?? ws?.workspace_id ?? "");
+  }
+  if (!workspaceId) throw new Error("Failed to create Browser Use workspace");
+
+  if (stageInputKeys && stageInputKeys.length > 0) {
+    await stageInputsToWorkspace(ctx, submission, workspaceId, stageInputKeys);
+  }
+
+  const task = buildPortalTask(submission, submission.portalUrl, intent, extraInstruction);
+  const secretBindings = await getPortalSecretBindings(ctx, submission.userId, submission.portalUrl);
+  const configuredModel = getBrowserUseConfiguredModel();
+  const { id: runId, sessionId, workspaceId: resolvedWs } = await createRun({
+    task,
+    workspaceId,
+    profileId,
+    keepAlive: RUN_KEEP_ALIVE_SECONDS,
+    secretBindings,
+    ...(configuredModel ? { model: configuredModel } : {}),
+  });
+
+  await ctx.runMutation(internal.submissions.updateSubmission, {
+    submissionId,
+    status: intent === "upload" ? "submitting" : "preparing",
+    error: undefined,
+    browserJob: {
+      provider: "browser_use",
+      intent,
+      phase: intent === "upload" ? "upload" : "portal_task",
+      status: "queued",
+      runId,
+      sessionId,
+      workspaceId: resolvedWs ?? workspaceId,
+      profileId,
+      lastSyncedAt: now(),
+      attempts: (submission.browserJob?.attempts ?? 0) + 1,
+      keepAliveUntil: now() + RUN_KEEP_ALIVE_SECONDS * 1000,
+    },
+    auditEvent: intent === "upload" ? "browser_use_upload_started" : "browser_use_task_started",
+    auditDetail: {
+      runId,
+      sessionId,
+      workspaceId: resolvedWs ?? workspaceId,
+      profileId,
+      model: configuredModel ?? "bu_default",
+      secretBindings: "portal_email,portal_password",
+    },
+  });
+
+  await ctx.scheduler.runAfter(POLL_INTERVAL_MS, internal.browserUseJobs.pollSubmissionJob, { submissionId });
+  return { runId, sessionId, workspaceId: resolvedWs ?? workspaceId, profileId };
+}
+
+export const startPortalJob = internalAction({
+  args: {
+    submissionId: v.id("submissions"),
+    intent: v.optional(v.string()),
+    extraInstruction: v.optional(v.string()),
+    stageInputKeys: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    return await startRunForSubmission(
+      ctx,
+      args.submissionId,
+      args.intent ?? "portal_task",
+      args.extraInstruction,
+      args.stageInputKeys,
+    );
+  },
+});
+
+export const startUploadJob = internalAction({
+  args: { submissionId: v.id("submissions") },
+  handler: async (ctx, args): Promise<{ runId: string; sessionId?: string; workspaceId?: string; profileId: string }> => {
+    const submission: Doc<"submissions"> | null = await ctx.runQuery(internal.submissions.getSubmissionInternal, { submissionId: args.submissionId });
+    if (!submission) throw new Error("Submission not found");
+    const candidate = submission.files.uploadCandidate;
+    if (!candidate) throw new Error("No upload candidate is set for this submission");
+
+    let workspaceId = submission.browserJob?.workspaceId;
+    if (!workspaceId) {
+      const ws: { id?: string; workspaceId?: string; workspace_id?: string } = await createWorkspace(`sub-${String(args.submissionId)}`);
+      workspaceId = String(ws?.id ?? ws?.workspaceId ?? ws?.workspace_id ?? "");
+    }
+    if (!workspaceId) throw new Error("Failed to create Browser Use workspace");
+
+    const bytes = await getFromR2(candidate.key);
+    await tolerantUploadToWorkspace({
+      workspaceId,
+      filename: candidate.name || "upload-candidate",
+      bytes,
+      contentType: guessContentType(candidate.name || candidate.key),
+    });
+
+    await ctx.runMutation(internal.submissions.updateSubmission, {
+      submissionId: args.submissionId,
+      browserJobPatch: { intent: "upload", workspaceId, phase: "upload" },
+      auditEvent: "browser_use_upload_candidate_staged",
+      auditDetail: { workspaceId, filename: candidate.name, key: candidate.key },
+    });
+
+    return await startRunForSubmission(
+      ctx,
+      args.submissionId,
+      "upload",
+      `Upload the prepared file named "${candidate.name}" from the workspace (look under uploads/) for this goal, then submit/confirm if required.`,
+    );
+  },
+});
+
+async function ingestRunOutputs(ctx: any, submission: Doc<"submissions">, run: any, intent: string) {
+  const workspaceId = submission.browserJob?.workspaceId;
+  if (!workspaceId) throw new Error("No Browser Use workspace to ingest from");
+  let files: Array<{ path: string; bytes: Uint8Array; size: number }> = [];
+  try {
+    files = await downloadWorkspaceFilesTolerant({
+      workspaceId,
+      deadlineMs: URL_TOLERANCE_MS,
+      pathHints: [".xlsx", ".xls", ".csv", ".pdf", ".txt", ".md", ".json", "output", "uploads", "sheet", "result"],
+    });
+  } catch (e) {
+    // No downloadable outputs: for uploads treat a successful run as completed (charge on done)
+    // to avoid leaving funds reserved/stuck; for non-upload tasks move to awaiting_review.
+    const nextStatus = intent === "upload" ? "done" : "awaiting_review";
+    await ctx.runMutation(internal.submissions.updateSubmission, {
+      submissionId: submission._id,
+      status: nextStatus,
+      error: undefined,
+      browserJobPatch: {
+        intent,
+        status: "completed",
+        phase: intent === "upload" ? "done" : "completed_no_outputs",
+        lastSyncedAt: now(),
+        resultSummary: truncateError(
+          (run as any)?.result ?? (intent === "upload"
+            ? "Upload completed (no downloadable receipt/output captured)"
+            : "Completed (no downloadable outputs found)"),
+          "Completed",
+        ),
+      },
+      auditEvent: intent === "upload" ? "browser_use_upload_completed_no_outputs" : "browser_use_completed_no_outputs",
+      auditDetail: { intent, error: e instanceof Error ? e.message : String(e), result: (run as any)?.result ?? null },
+    });
+    return;
+  }
+
+  let candidates = files.filter((f) => f.path);
+  const relevant = candidates.filter((f) => isLikelyRelevantPath(f.path));
+  if (relevant.length > 0) candidates = relevant;
+  // keep bounded number of artifacts
+  candidates = candidates.slice(0, MAX_INGEST_FILES);
+  const existingKeys = new Set((submission.files.outputs ?? []).map((o) => o.key));
+  const newOutputs: Array<{ key: string; name: string; size: number; sourcePath: string }> = [];
+
+  for (const file of candidates) {
+    const originalName = sanitizeFileName(file.path.split(/[\\/]/).pop() || "output.bin");
+    const baseKey = `submissions/${submission._id}/outputs/${sanitizeFileName(file.path).replace(/^_+/, "") || originalName}`;
+    let key = baseKey;
+    if (existingKeys.has(key)) {
+      key = `submissions/${submission._id}/outputs/${Date.now()}-${originalName}`;
+    }
+    await putToR2(key, file.bytes, guessContentType(originalName));
+    existingKeys.add(key);
+    newOutputs.push({ key, name: originalName, size: file.size, sourcePath: file.path });
+  }
+
+  const nextStatus = intent === "upload" ? "done" : "awaiting_review";
+  await ctx.runMutation(internal.submissions.updateSubmission, {
+    submissionId: submission._id,
+    status: nextStatus,
+    error: undefined,
+    appendOutputs: newOutputs.length > 0 ? newOutputs : undefined,
+    browserJobPatch: {
+      intent,
+      status: "completed",
+      phase: nextStatus === "done" ? "done" : "awaiting_review",
+      lastSyncedAt: now(),
+      resultSummary: truncateError(
+        (run as any)?.result ?? (newOutputs.length ? `Ingested ${newOutputs.length} output file(s)` : "Completed"),
+        "Completed",
+      ),
+    },
+    auditEvent: intent === "upload" ? "browser_use_upload_completed" : "browser_use_outputs_ingested",
+    auditDetail: {
+      intent,
+      outputs: newOutputs,
+      result: (run as any)?.result ?? null,
+    },
+  });
 }
 
 function classifyTerminal(
@@ -196,7 +485,6 @@ function classifyTerminal(
   const message = truncateError(run?.error || run?.result, "Browser automation failed");
 
   if (status === "completed") {
-    // handled by ingest/upload completion paths
     return { submissionStatus: submission.status };
   }
 
@@ -229,238 +517,6 @@ function classifyTerminal(
   return { submissionStatus: "failed", error: message };
 }
 
-export const ensureConnectionProfile = internalAction({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args): Promise<{ profileId: string; created: boolean }> => {
-    const conn = await ctx.runQuery(internal.workspace.getConnectionInternal, { userId: args.userId });
-    if (!conn) throw new Error("No workspace connection found");
-    if (conn.browserUseProfileId) return { profileId: conn.browserUseProfileId, created: false };
-    const created: any = await createProfile(`officeworker-${String(args.userId)}`);
-    const profileId = String(created?.id ?? created?.profileId ?? created?.profile_id ?? "");
-    if (!profileId) throw new Error("Failed to create Browser Use profile");
-    await ctx.runMutation(internal.workspace.setBrowserUseProfile, {
-      userId: args.userId,
-      browserUseProfileId: profileId,
-      browserUseProfileStatus: "unknown",
-    });
-    return { profileId, created: true };
-  },
-});
-
-async function ensureConnectionProfileForUser(
-  ctx: any,
-  userId: Id<"users">,
-): Promise<{ profileId: string; created: boolean }> {
-  const conn = await ctx.runQuery(internal.workspace.getConnectionInternal, { userId });
-  if (!conn) throw new Error("No workspace connection found");
-  if (conn.browserUseProfileId) return { profileId: conn.browserUseProfileId, created: false };
-  const created: any = await createProfile(`officeworker-${String(userId)}`);
-  const profileId = String(created?.id ?? created?.profileId ?? created?.profile_id ?? "");
-  if (!profileId) throw new Error("Failed to create Browser Use profile");
-  await ctx.runMutation(internal.workspace.setBrowserUseProfile, {
-    userId,
-    browserUseProfileId: profileId,
-    browserUseProfileStatus: "unknown",
-  });
-  return { profileId, created: true };
-}
-
-async function startRunForSubmission(ctx: any, submissionId: Id<"submissions">, intent: "download" | "upload") {
-  const submission: Doc<"submissions"> | null = await ctx.runQuery(internal.submissions.getSubmissionInternal, { submissionId });
-  if (!submission) throw new Error("Submission not found");
-  const conn = await ctx.runQuery(internal.workspace.getConnectionInternal, { userId: submission.userId });
-  if (!conn) throw new Error("No workspace connection found");
-
-  let profileId = conn.browserUseProfileId as string | undefined;
-  if (!profileId) {
-    const ensured = await ensureConnectionProfileForUser(ctx, submission.userId);
-    profileId = ensured.profileId;
-  }
-
-  // create or reuse workspace
-  let workspaceId = submission.browserJob?.workspaceId as string | undefined;
-  if (!workspaceId) {
-    const ws: any = await createWorkspace(`sub-${String(submissionId)}`);
-    workspaceId = String(ws?.id ?? ws?.workspaceId ?? ws?.workspace_id ?? "");
-  }
-
-  const task =
-    intent === "upload"
-      ? buildUploadTask(
-          submission,
-          submission.portalUrl,
-          submission.files.filled?.originalName ?? "filled.xlsx",
-        )
-      : buildDownloadTask(submission, submission.portalUrl);
-
-  const secretBindings = await getPortalSecretBindings(ctx, submission.userId, submission.portalUrl);
-
-  // BU Cloud run agent model (optional, distinct from assistant AI_MODEL). If unset, BU uses its default.
-  const configuredModel = getBrowserUseConfiguredModel();
-  const { id: runId, sessionId, workspaceId: resolvedWs } = await createRun({
-    task,
-    workspaceId,
-    profileId,
-    keepAlive: RUN_KEEP_ALIVE_SECONDS,
-    secretBindings,
-    ...(configuredModel ? { model: configuredModel } : {}),
-  });
-
-  await ctx.runMutation(internal.submissions.updateSubmission, {
-    submissionId,
-    status: intent === "upload" ? "submitting" : "preparing",
-    error: undefined,
-    browserJob: {
-      provider: "browser_use",
-      intent,
-      phase: intent === "upload" ? "upload_filled" : "download_template",
-      status: "queued",
-      runId,
-      sessionId,
-      workspaceId: resolvedWs ?? workspaceId,
-      profileId,
-      lastSyncedAt: now(),
-      attempts: (submission.browserJob?.attempts ?? 0) + 1,
-      keepAliveUntil: now() + RUN_KEEP_ALIVE_SECONDS * 1000,
-    },
-    auditEvent: intent === "upload" ? "browser_use_upload_started" : "browser_use_download_started",
-    auditDetail: {
-      runId,
-      sessionId,
-      workspaceId: resolvedWs ?? workspaceId,
-      profileId,
-      model: configuredModel ?? "bu_default",
-      secretBindings: "portal_email,portal_password",
-    },
-  });
-
-  // kick off polling (control hardening deferred)
-  await ctx.scheduler.runAfter(POLL_INTERVAL_MS, internal.browserUseJobs.pollSubmissionJob, { submissionId });
-  return { runId, sessionId, workspaceId: resolvedWs ?? workspaceId, profileId };
-}
-
-export const startDownloadJob = internalAction({
-  args: { submissionId: v.id("submissions") },
-  handler: async (ctx, args) => {
-    return await startRunForSubmission(ctx, args.submissionId, "download");
-  },
-});
-
-export const startUploadJob = internalAction({
-  args: { submissionId: v.id("submissions") },
-  handler: async (ctx, args) => {
-    const submission: Doc<"submissions"> | null = await ctx.runQuery(internal.submissions.getSubmissionInternal, { submissionId: args.submissionId });
-    if (!submission) throw new Error("Submission not found");
-    if (!submission.files.filled) throw new Error("No filled sheet to upload");
-
-    // ensure workspace exists and upload filled file into it before run
-    let workspaceId = submission.browserJob?.workspaceId as string | undefined;
-    if (!workspaceId) {
-      const ws: any = await createWorkspace(`sub-${String(args.submissionId)}`);
-      workspaceId = String(ws?.id ?? ws?.workspaceId ?? ws?.workspace_id ?? "");
-    }
-    if (!workspaceId) throw new Error("Failed to create Browser Use workspace");
-
-    // fetch filled file bytes from R2 and upload to BU workspace (tolerant, ~5min)
-    const config = getR2Config();
-    if (!config) throw new Error("R2 is not configured");
-    const { GetObjectCommand } = await import("@aws-sdk/client-s3");
-    const obj = await createR2Client(config).send(new GetObjectCommand({ Bucket: config.bucket, Key: submission.files.filled.key }));
-    const body = obj.Body;
-    if (!body) throw new Error("Filled file missing in storage");
-    const bytes = new Uint8Array(await body.transformToByteArray());
-    await tolerantUploadToWorkspace({
-      workspaceId,
-      filename: submission.files.filled.originalName || "filled.xlsx",
-      bytes,
-      contentType: guessContentType(submission.files.filled.originalName || "filled.xlsx"),
-    });
-
-    await ctx.runMutation(internal.submissions.updateSubmission, {
-      submissionId: args.submissionId,
-      browserJobPatch: { intent: "upload", workspaceId, phase: "upload_filled" },
-      auditEvent: "browser_use_filled_uploaded_to_workspace",
-      auditDetail: { workspaceId, filename: submission.files.filled.originalName },
-    });
-
-    return await startRunForSubmission(ctx, args.submissionId, "upload");
-  },
-});
-
-async function ingestDownloadArtifacts(ctx: any, submission: Doc<"submissions">) {
-  const workspaceId = submission.browserJob?.workspaceId;
-  if (!workspaceId) throw new Error("No Browser Use workspace to ingest from");
-  // Tolerant download: re-lists workspace files (all pages) to refresh ~60s presigned URLs and retries for ~5min.
-  const files = await downloadWorkspaceFilesTolerant({
-    workspaceId,
-    deadlineMs: URL_TOLERANCE_MS,
-    pathHints: [".xlsx", ".xls", ".csv", "sheet", "template", "score", "output", "uploads"],
-  });
-  // choose best spreadsheet candidate
-  const spreadsheets = files.filter((f) => isSpreadsheetPath(f.path));
-  const chosen = spreadsheets[0] ?? files[0];
-  if (!chosen) throw new Error("No files downloaded from portal workspace");
-  const originalName = sanitizeFileName(chosen.path.split(/[\\/]/).pop() || "template.xlsx");
-  const key = `submissions/${submission._id}/template/${originalName}`;
-  await putToR2(key, chosen.bytes, guessContentType(originalName));
-
-  await ctx.runMutation(internal.submissions.updateSubmission, {
-    submissionId: submission._id,
-    status: "awaiting_scores",
-    error: undefined,
-    templateKey: key,
-    templateName: originalName,
-    browserJobPatch: {
-      intent: submission.browserJob?.intent ?? "download",
-      status: "completed",
-      phase: "awaiting_scores",
-      lastSyncedAt: now(),
-      resultSummary: `Downloaded ${originalName}`,
-    },
-    auditEvent: "browser_use_template_ingested",
-    auditDetail: { key, originalName, files: files.map((f) => ({ path: f.path, size: f.size })) },
-  });
-}
-
-async function markUploadCompleted(ctx: any, submission: Doc<"submissions">, run: any) {
-  const status = String(run?.status ?? "").toLowerCase();
-  if (status === "completed") {
-    await ctx.runMutation(internal.submissions.updateSubmission, {
-      submissionId: submission._id,
-      status: "done",
-      error: undefined,
-      browserJobPatch: {
-        intent: "upload",
-        status: "completed",
-        phase: "done",
-        lastSyncedAt: now(),
-        resultSummary: truncateError(run?.result ?? "Uploaded successfully", "Uploaded successfully"),
-      },
-      auditEvent: "browser_use_upload_completed",
-      auditDetail: { result: run?.result ?? null },
-    });
-    return;
-  }
-  const mapped = classifyTerminal(submission, run);
-  const nextStatus =
-    mapped.submissionStatus === submission.status || mapped.submissionStatus === "submitting"
-      ? "failed"
-      : mapped.submissionStatus;
-  await ctx.runMutation(internal.submissions.updateSubmission, {
-    submissionId: submission._id,
-    status: nextStatus,
-    error: mapped.error ?? "Upload did not complete successfully",
-    browserJobPatch: {
-      intent: "upload",
-      status: String(run?.status ?? "failed"),
-      lastSyncedAt: now(),
-      lastError: mapped.error ?? String(run?.error ?? ""),
-    },
-    auditEvent: nextStatus === "login_failed" ? "browser_use_login_failed" : "browser_use_upload_failed",
-    auditDetail: { status: run?.status, error: run?.error ?? null, result: run?.result ?? null },
-  });
-}
-
 export const pollSubmissionJob = internalAction({
   args: { submissionId: v.id("submissions") },
   handler: async (ctx, args) => {
@@ -479,28 +535,19 @@ export const pollSubmissionJob = internalAction({
 
       let nextEventCursor: number | undefined = toEventCursor(job.lastEventCursor);
       try {
-        // Drain event pages (v4 nextAfter/hasMore) so we don't miss state/cues.
         const ev = await drainRunEvents(job.runId, nextEventCursor ?? null);
         if (typeof ev.nextAfter === "number" && Number.isFinite(ev.nextAfter)) {
           nextEventCursor = ev.nextAfter;
         }
-        const prevCursor = toEventCursor(job.lastEventCursor);
-        if (nextEventCursor !== prevCursor || ev.events.length > 0) {
-          await ctx.runMutation(internal.submissions.updateSubmission, {
-            submissionId: submission._id,
-            browserJobPatch: {
-              intent: job.intent,
-              status,
-              lastEventCursor: nextEventCursor,
-              lastSyncedAt: now(),
-            },
-          });
-        } else {
-          await ctx.runMutation(internal.submissions.updateSubmission, {
-            submissionId: submission._id,
-            browserJobPatch: { intent: job.intent, status, lastSyncedAt: now() },
-          });
-        }
+        await ctx.runMutation(internal.submissions.updateSubmission, {
+          submissionId: submission._id,
+          browserJobPatch: {
+            intent: job.intent,
+            status,
+            lastEventCursor: nextEventCursor,
+            lastSyncedAt: now(),
+          },
+        });
       } catch {
         await ctx.runMutation(internal.submissions.updateSubmission, {
           submissionId: submission._id,
@@ -519,34 +566,26 @@ export const pollSubmissionJob = internalAction({
       const runStatus = String((run as any)?.status ?? status ?? "").toLowerCase();
 
       if (isSuccessRunStatus(runStatus)) {
-        if (job.intent === "upload") {
-          await markUploadCompleted(ctx, submission, run);
-        } else {
-          try {
-            await ingestDownloadArtifacts(ctx, submission);
-          } catch (e) {
-            await ctx.runMutation(internal.submissions.updateSubmission, {
-              submissionId: submission._id,
-              status: "failed",
-              error: e instanceof Error ? `Artifacts ingest failed: ${e.message}` : "Artifacts ingest failed",
-              browserJobPatch: {
-                intent: job.intent,
-                status: runStatus,
-                lastSyncedAt: now(),
-                lastError: e instanceof Error ? e.message : String(e),
-              },
-              auditEvent: "browser_use_ingest_failed",
-              auditDetail: { error: e instanceof Error ? e.message : String(e), result: (run as any)?.result ?? null },
-            });
-          }
+        try {
+          await ingestRunOutputs(ctx, submission, run, job.intent || "portal_task");
+        } catch (e) {
+          await ctx.runMutation(internal.submissions.updateSubmission, {
+            submissionId: submission._id,
+            status: job.intent === "upload" ? "failed" : "failed",
+            error: e instanceof Error ? `Output ingest failed: ${e.message}` : "Output ingest failed",
+            browserJobPatch: {
+              intent: job.intent,
+              status: runStatus,
+              lastSyncedAt: now(),
+              lastError: e instanceof Error ? e.message : String(e),
+            },
+            auditEvent: "browser_use_ingest_failed",
+            auditDetail: { error: e instanceof Error ? e.message : String(e), result: (run as any)?.result ?? null },
+          });
         }
       } else {
         const mapped = classifyTerminal(submission, run);
-        const nextStatus =
-          job.intent === "upload" &&
-          (mapped.submissionStatus === "preparing" || mapped.submissionStatus === submission.status)
-            ? "failed"
-            : mapped.submissionStatus;
+        const nextStatus = mapped.submissionStatus;
         await ctx.runMutation(internal.submissions.updateSubmission, {
           submissionId: submission._id,
           status: nextStatus,
@@ -573,7 +612,6 @@ export const pollSubmissionJob = internalAction({
         auditEvent: "browser_use_poll_error",
         auditDetail: { error: e instanceof Error ? e.message : String(e) },
       });
-      // schedule another poll attempt (basic; backoff deferred)
       if (!job.syncDisabled) {
         await ctx.scheduler.runAfter(POLL_INTERVAL_MS * 2, internal.browserUseJobs.pollSubmissionJob, { submissionId: args.submissionId });
       }
@@ -583,43 +621,50 @@ export const pollSubmissionJob = internalAction({
 });
 
 export const resumeOrRetrySubmission = internalAction({
-  args: { submissionId: v.id("submissions") },
+  args: { submissionId: v.id("submissions"), extraInstruction: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const submission: Doc<"submissions"> | null = await ctx.runQuery(internal.submissions.getSubmissionInternal, { submissionId: args.submissionId });
     if (!submission) throw new Error("Submission not found");
     const job = submission.browserJob;
 
-    // If an upload previously failed but a filled sheet exists, move back to review
-    // so the teacher can explicitly approve before any new upload attempt.
-    if (
-      submission.files.filled &&
-      (job?.intent === "upload" || submission.status === "submitting" || job?.phase === "upload_filled") &&
-      ["failed", "login_failed"].includes(submission.status)
-    ) {
+    if (submission.status === "failed" || submission.status === "login_failed" || submission.status === "cancelled") {
+      // If an upload failed after a candidate was prepared, return to review so teacher can explicitly approve again.
+      if (submission.files.uploadCandidate && (job?.intent === "upload" || submission.chargeStatus === "reserved")) {
+        await ctx.runMutation(internal.submissions.updateSubmission, {
+          submissionId: args.submissionId,
+          status: "awaiting_review",
+          error: undefined,
+          auditEvent: "retry_ready_for_review",
+          auditDetail: { from: submission.status, intent: job?.intent ?? null },
+        });
+        return { action: "moved_to_review" as const };
+      }
+      const intent = job?.intent && job.intent !== "upload" ? job.intent : "portal_task";
       await ctx.runMutation(internal.submissions.updateSubmission, {
         submissionId: args.submissionId,
-        status: "awaiting_review",
+        status: "preparing",
         error: undefined,
-        auditEvent: "retry_ready_for_review",
-        auditDetail: { from: submission.status, phase: job?.phase ?? null },
+        auditEvent: "browser_use_retry_restart",
+        auditDetail: { previousIntent: job?.intent ?? null, restartIntent: intent },
       });
-      return { action: "moved_to_review" as const };
+      await startRunForSubmission(ctx, args.submissionId, intent, args.extraInstruction);
+      return { action: "restarted" as const };
     }
 
-    // Restart automation with secret-based login (best-effort, no live HITL).
-    const intent: "download" | "upload" =
-      submission.files.filled && job?.intent === "upload" && submission.status === "awaiting_review"
-        ? "upload"
-        : "download";
-    await ctx.runMutation(internal.submissions.updateSubmission, {
-      submissionId: args.submissionId,
-      status: "preparing",
-      error: undefined,
-      auditEvent: "browser_use_retry_restart",
-      auditDetail: { previousIntent: job?.intent ?? null, restartIntent: intent },
-    });
-    await startRunForSubmission(ctx, args.submissionId, intent);
-    return { action: "restarted" as const };
+    if (submission.status === "awaiting_review" && args.extraInstruction?.trim()) {
+      // Continue the chained flow on the same workspace/submission with a new instruction.
+      await ctx.runMutation(internal.submissions.updateSubmission, {
+        submissionId: args.submissionId,
+        status: "preparing",
+        error: undefined,
+        auditEvent: "browser_use_continue",
+        auditDetail: { intent: job?.intent ?? "portal_task" },
+      });
+      await startRunForSubmission(ctx, args.submissionId, job?.intent ?? "portal_task", args.extraInstruction);
+      return { action: "continued" as const };
+    }
+
+    return { action: "noop" as const };
   },
 });
 
