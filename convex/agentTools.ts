@@ -282,29 +282,6 @@ export const matchNamesTool = createTool({
   },
 });
 
-export const webSearchTool = createTool({
-  description:
-    "Search the web for factual information when needed (e.g. official " +
-    "terminology or portal-related facts). Returns a short list of results " +
-    "with titles, URLs, and snippets. Not for finding student scores.",
-  inputSchema: z.object({
-    query: z.string().describe("Search query"),
-    numResults: z
-      .number()
-      .int()
-      .min(1)
-      .max(10)
-      .optional()
-      .describe("Number of results (default 5)"),
-  }),
-  execute: async (ctx, input): Promise<string> => {
-    return await ctx.runAction(internal.webSearch.searchAction, {
-      query: input.query,
-      numResults: input.numResults,
-    });
-  },
-});
-
 export const approveSubmissionTool = createTool({
   description:
     "Approve a submission for upload to the portal. ONLY call this when the " +
@@ -408,7 +385,6 @@ export const agentTools = {
   read_file: readFileTool,
   edit_file: editFileTool,
   match_names: matchNamesTool,
-  web_search: webSearchTool,
   approve_submission: approveSubmissionTool,
   retry_submission: retrySubmissionTool,
   cancel_submission: cancelSubmissionTool,
