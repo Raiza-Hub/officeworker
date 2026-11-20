@@ -5,14 +5,11 @@ import { action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { encryptSecret, decryptSecret } from "./encryption";
-
-const DEFAULT_PORTAL_KEY = "diper";
-const DEFAULT_PORTAL_URL = "https://diper.ogunstate.gov.ng";
+import { resolvePortalAdapter } from "./portalAdapter";
 
 export const upsertConnection = action({
   args: {
-    portalKey: v.optional(v.string()),
-    portalUrl: v.optional(v.string()),
+    portalUrl: v.string(),
     portalEmail: v.string(),
     password: v.string(),
   },
@@ -20,8 +17,7 @@ export const upsertConnection = action({
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("Not authenticated");
 
-    const portalKey = args.portalKey?.trim() || DEFAULT_PORTAL_KEY;
-    const portalUrl = args.portalUrl?.trim() || DEFAULT_PORTAL_URL;
+    const portal = resolvePortalAdapter(args.portalUrl);
     const portalEmail = args.portalEmail.trim().toLowerCase();
     if (!portalEmail || !portalEmail.includes("@")) {
       throw new Error("Enter a valid email address");
@@ -31,11 +27,10 @@ export const upsertConnection = action({
     }
 
     const ciphertext = encryptSecret(args.password);
-
     await ctx.runMutation(internal.workspace.insertConnection, {
       userId,
-      portalKey,
-      portalUrl,
+      adapterId: portal.adapterId,
+      portalUrl: portal.portalUrl,
       portalEmail,
       ciphertext,
     });
@@ -44,33 +39,31 @@ export const upsertConnection = action({
   },
 });
 
-// Internal use only (trigger.dev flows in Phase 4). Decrypts in memory;
-// plaintext never leaves the action return value, is never logged.
+// Internal use only. Decrypts in memory; plaintext never leaves the action
+// return value and is never logged. Used by Browser Use job orchestration to
+// supply per-run secret bindings (best-effort, no live HITL); values are not
+// sent to the agent as task text.
 export const getDecryptedCredentials = internalAction({
-  args: {
-    userId: v.id("users"),
-    portalKey: v.optional(v.string()),
-  },
+  args: { userId: v.id("users") },
   handler: async (
     ctx,
     args,
   ): Promise<{
-    portalKey: string;
+    adapterId: string;
     portalUrl: string;
     portalEmail: string;
     password: string;
+    browserUseProfileId: string | null;
   }> => {
-    const portalKey = args.portalKey?.trim() || DEFAULT_PORTAL_KEY;
-    const connection = await ctx.runQuery(
-      internal.workspace.getConnectionForDecrypt,
-      { userId: args.userId, portalKey },
-    );
-
+    const connection = await ctx.runQuery(internal.workspace.getConnectionForDecrypt, {
+      userId: args.userId,
+    });
     return {
-      portalKey: connection.portalKey,
+      adapterId: connection.adapterId,
       portalUrl: connection.portalUrl,
       portalEmail: connection.portalEmail,
       password: decryptSecret(connection.ciphertext),
+      browserUseProfileId: connection.browserUseProfileId,
     };
   },
 });

@@ -2,21 +2,6 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
-import type { Id } from "./_generated/dataModel";
-
-function requireCallbackSecret(request: Request): void {
-  const secret = process.env.TRIGGER_CALLBACK_SECRET;
-  if (!secret) {
-    throw new Error("TRIGGER_CALLBACK_SECRET is not set");
-  }
-  if (request.headers.get("x-callback-secret") !== secret) {
-    throw new Error("Unauthorized callback");
-  }
-}
-
-function jsonOk(body: Record<string, unknown>): Response {
-  return Response.json({ ok: true, ...body });
-}
 
 function jsonError(message: string, status = 400): Response {
   return Response.json({ ok: false, error: message }, { status });
@@ -51,20 +36,55 @@ async function verifyKorapaySignature(data: unknown, signature: string, secret: 
   return safeEqual(toHex(new Uint8Array(digest)), signature.toLowerCase());
 }
 
+function normalizePaymentMethod(value: unknown): string | undefined {
+  const raw =
+    typeof value === "string"
+      ? value
+      : value && typeof value === "object"
+        ? ((value as { type?: unknown; name?: unknown; method?: unknown }).type ??
+          (value as { type?: unknown; name?: unknown; method?: unknown }).name ??
+          (value as { type?: unknown; name?: unknown; method?: unknown }).method)
+        : undefined;
+  if (typeof raw !== "string") return undefined;
+  const normalized = raw.toLowerCase().replace(/[\s_-]+/g, " ").trim();
+  if (!normalized) return undefined;
+  if (normalized.includes("card")) return "Card";
+  if (normalized.includes("pay with bank")) return "Pay with bank";
+  if (normalized.includes("bank transfer") || normalized === "bank" || normalized === "transfer") {
+    return "Bank transfer";
+  }
+  if (normalized.includes("paywithbank")) return "Pay with bank";
+  if (normalized.includes("banktransfer")) return "Bank transfer";
+  return undefined;
+}
+
+function extractPaymentMethod(...sources: Array<Record<string, unknown> | undefined>): string {
+  for (const source of sources) {
+    if (!source) continue;
+    for (const key of [
+      "payment_method",
+      "paymentMethod",
+      "channel",
+      "payment_type",
+      "payment_channel",
+      "method",
+      "authorization",
+    ]) {
+      const label = normalizePaymentMethod(source[key]);
+      if (label) return label;
+    }
+  }
+  return "Korapay";
+}
+
 const korapayWebhook = httpAction(async (ctx, request) => {
   const secret = process.env.KORAPAY_SECRET_KEY;
   const signature = request.headers.get("x-korapay-signature");
   if (!secret || !signature) return jsonError("Invalid webhook signature", 401);
 
   let payload: {
-    event?: string | { type?: string };
-    data?: {
-      reference?: string;
-      payment_reference?: string;
-      status?: string;
-      amount?: string | number;
-      currency?: string;
-    };
+    event?: string | { event?: string; type?: string } | { type?: string };
+    data?: Record<string, unknown>;
   };
   try {
     payload = await request.json();
@@ -74,41 +94,76 @@ const korapayWebhook = httpAction(async (ctx, request) => {
   if (!(await verifyKorapaySignature(payload.data, signature, secret))) {
     return jsonError("Invalid webhook signature", 401);
   }
-  const eventType = typeof payload.event === "string" ? payload.event : payload.event?.type;
-  if (eventType !== "charge.success" || !payload.data?.reference) {
+
+  const eventType =
+    typeof payload.event === "string"
+      ? payload.event
+      : (payload.event as { type?: string } | undefined)?.type;
+  const payloadData = payload.data ?? {};
+  const payloadRef =
+    typeof payloadData.reference === "string" ? payloadData.reference : undefined;
+  if ((eventType !== "charge.success" && eventType !== "charge.failed") || !payloadRef) {
     return Response.json({ ok: true, ignored: true });
   }
 
   try {
     const verification = await fetch(
-      `https://api.korapay.com/merchant/api/v1/charges/${encodeURIComponent(payload.data.reference)}`,
+      `https://api.korapay.com/merchant/api/v1/charges/${encodeURIComponent(payloadRef)}`,
       { headers: { Authorization: `Bearer ${secret}` } },
     );
     const result = (await verification.json()) as {
       status?: boolean | string;
-      data?: {
-        reference?: string;
-        payment_reference?: string;
-        status?: string;
-        amount?: string | number;
-        amount_paid?: string | number;
-        currency?: string;
-      };
+      data?: Record<string, unknown>;
     };
     const verified = result.data;
-    if (!verification.ok || String(result.status) !== "true" || verified?.status !== "success") {
+    if (!verification.ok || String(result.status) !== "true" || !verified) {
       return jsonError("Korapay has not verified this payment", 400);
     }
-    const reference =
-      verified.payment_reference ??
-      payload.data.payment_reference ??
-      verified.reference ??
-      payload.data.reference;
-    const amount = Number(verified.amount_paid ?? verified.amount);
+
+    const verifiedRef =
+      typeof verified.reference === "string" ? verified.reference : undefined;
+    const verifiedPaymentRef =
+      typeof verified.payment_reference === "string" ? verified.payment_reference : undefined;
+    const payloadPaymentRef =
+      typeof payloadData.payment_reference === "string"
+        ? payloadData.payment_reference
+        : undefined;
+    const reference = verifiedPaymentRef ?? payloadPaymentRef ?? verifiedRef ?? payloadRef;
+    const paymentMethod = extractPaymentMethod(verified, payloadData);
+    const gatewayStatus =
+      typeof verified.status === "string"
+        ? verified.status
+        : typeof payloadData.status === "string"
+          ? payloadData.status
+          : undefined;
+    const currency =
+      (typeof verified.currency === "string" ? verified.currency : undefined) ??
+      (typeof payloadData.currency === "string" ? payloadData.currency : undefined) ??
+      "";
+
+    if (eventType === "charge.failed" || verified.status === "failed") {
+      await ctx.runMutation(internal.billing.markTopupFailed, {
+        reference,
+        paymentMethod,
+        gatewayStatus: gatewayStatus ?? "failed",
+        gatewayReference: verifiedRef ?? payloadRef,
+        currency: currency || undefined,
+      });
+      return Response.json({ ok: true });
+    }
+
+    if (verified.status !== "success") {
+      return jsonError("Korapay has not verified this payment", 400);
+    }
+
+    const amount = Number(verified.amount_paid ?? verified.amount ?? payloadData.amount);
     await ctx.runMutation(internal.billing.applyTopup, {
       reference,
       amount,
-      currency: verified.currency ?? payload.data.currency ?? "",
+      currency,
+      paymentMethod,
+      gatewayStatus: "success",
+      gatewayReference: verifiedRef ?? payloadRef,
     });
     return Response.json({ ok: true });
   } catch (error) {
@@ -116,194 +171,14 @@ const korapayWebhook = httpAction(async (ctx, request) => {
   }
 });
 
-// trigger.dev task → Convex: idempotent submission state transition.
-export const taskUpdateSubmission = httpAction(async (ctx, request) => {
-    try {
-      requireCallbackSecret(request);
-    } catch (error) {
-      return jsonError(error instanceof Error ? error.message : "Unauthorized", 401);
-    }
-
-    let body: {
-      submissionId: string;
-      expectStatus?: string;
-      status?: string;
-      error?: string;
-      runIdKind?: string;
-      runId?: string;
-      templateKey?: string;
-      templateName?: string;
-      filledKey?: string;
-      filledName?: string;
-      auditEvent?: string;
-      auditDetail?: unknown;
-      mappings?: Array<{
-        studentName: string;
-        matchedName?: string;
-        matchConfidence?: number;
-        ca?: number;
-        exam?: number;
-        needsReview: boolean;
-        source: "ai" | "manual" | "edited";
-      }>;
-    };
-    try {
-      body = await request.json();
-    } catch {
-      return jsonError("Invalid JSON body");
-    }
-
-    if (typeof body.submissionId !== "string") {
-      return jsonError("submissionId is required");
-    }
-
-    try {
-      const result = await ctx.runMutation(internal.submissions.updateSubmission, {
-        submissionId: body.submissionId as Id<"submissions">,
-        expectStatus: body.expectStatus,
-        status: body.status as
-          | "draft"
-          | "preparing"
-          | "awaiting_review"
-          | "login_failed"
-          | "submitting"
-          | "done"
-          | "failed"
-          | "cancelled"
-          | undefined,
-        error: body.error,
-        runIdKind: body.runIdKind as "login" | "submit" | undefined,
-        runId: body.runId,
-        templateKey: body.templateKey,
-        templateName: body.templateName,
-        filledKey: body.filledKey,
-        filledName: body.filledName,
-        auditEvent: body.auditEvent,
-        auditDetail: body.auditDetail,
-      });
-      if (
-        body.mappings !== undefined &&
-        Array.isArray(body.mappings) &&
-        body.mappings.length > 0
-      ) {
-        await ctx.runMutation(internal.submissions.replaceScoreMappings, {
-          submissionId: body.submissionId as Id<"submissions">,
-          mappings: body.mappings,
-        });
-      }
-      return jsonOk({ applied: result.applied });
-    } catch (error) {
-      return jsonError(error instanceof Error ? error.message : "Update failed", 422);
-    }
-});
-
-// trigger.dev task → Convex: fetch the submission state (uploads, mappings).
-export const taskGetSubmissionState = httpAction(async (ctx, request) => {
-    try {
-      requireCallbackSecret(request);
-    } catch (error) {
-      return jsonError(error instanceof Error ? error.message : "Unauthorized", 401);
-    }
-
-    let submissionId: string;
-    try {
-      const body = (await request.json()) as { submissionId?: string };
-      if (typeof body.submissionId !== "string") {
-        return jsonError("submissionId is required");
-      }
-      submissionId = body.submissionId;
-    } catch {
-      return jsonError("Invalid JSON body");
-    }
-
-    const submission = await ctx.runQuery(
-      internal.submissions.getSubmissionForTask,
-      { submissionId: submissionId as Id<"submissions"> },
-    );
-    if (submission === null) {
-      return jsonError("Submission not found", 404);
-    }
-    return jsonOk({ submission });
-});
-
-// trigger.dev task → Convex: decrypted portal credentials for login.
-export const taskGetCredentials = httpAction(async (ctx, request) => {
-    try {
-      requireCallbackSecret(request);
-    } catch (error) {
-      return jsonError(error instanceof Error ? error.message : "Unauthorized", 401);
-    }
-
-    let body: { userId?: string; portalKey?: string };
-    try {
-      body = await request.json();
-    } catch {
-      return jsonError("Invalid JSON body");
-    }
-    if (typeof body.userId !== "string") {
-      return jsonError("userId is required");
-    }
-
-    try {
-      const credentials = await ctx.runAction(
-        internal.workspaceActions.getDecryptedCredentials,
-        { userId: body.userId as Id<"users">, portalKey: body.portalKey },
-      );
-      return jsonOk({ credentials });
-    } catch (error) {
-      return jsonError(error instanceof Error ? error.message : "Failed", 404);
-    }
-});
-
-// trigger.dev task → Convex: mark the workspace connection as errored.
-export const taskMarkConnectionError = httpAction(async (ctx, request) => {
-    try {
-      requireCallbackSecret(request);
-    } catch (error) {
-      return jsonError(error instanceof Error ? error.message : "Unauthorized", 401);
-    }
-
-    let body: { userId?: string; portalKey?: string; error?: string };
-    try {
-      body = await request.json();
-    } catch {
-      return jsonError("Invalid JSON body");
-    }
-    if (typeof body.userId !== "string" || typeof body.error !== "string") {
-      return jsonError("userId and error are required");
-    }
-
-    await ctx.runMutation(internal.workspace.markConnectionError, {
-      userId: body.userId as Id<"users">,
-      portalKey: body.portalKey ?? "diper",
-      error: body.error,
-    });
-    return jsonOk({});
-});
-
 const http = httpRouter();
 
 auth.addHttpRoutes(http);
-http.route({ path: "/korapay-webhook", method: "POST", handler: korapayWebhook });
+
 http.route({
-  path: "/task_callbacks/update-submission",
+  path: "/billing/korapay-webhook",
   method: "POST",
-  handler: taskUpdateSubmission,
-});
-http.route({
-  path: "/task_callbacks/submission-state",
-  method: "POST",
-  handler: taskGetSubmissionState,
-});
-http.route({
-  path: "/task_callbacks/credentials",
-  method: "POST",
-  handler: taskGetCredentials,
-});
-http.route({
-  path: "/task_callbacks/mark-connection-error",
-  method: "POST",
-  handler: taskMarkConnectionError,
+  handler: korapayWebhook,
 });
 
 export default http;
