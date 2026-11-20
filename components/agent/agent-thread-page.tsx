@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation } from "convex/react";
+import { ConvexError } from "convex/values";
 import { toast } from "sonner";
 import { optimisticallySendMessage } from "@convex-dev/agent/react";
 import { api } from "@/convex/_generated/api";
@@ -16,6 +17,11 @@ import {
   MessagesStatusContext,
   ThreadTitleContext,
 } from "@/components/agent/thread-contexts";
+import {
+  BillingNotice,
+  billingNoticeForError,
+  type BillingNoticeData,
+} from "@/components/agent/billing-notice";
 
 export function AgentThreadFrame({
   threadId,
@@ -27,13 +33,14 @@ export function AgentThreadFrame({
   const [prompt, setPrompt] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [composerNotice, setComposerNotice] = useState<BillingNoticeData | null>(null);
   const [messagesStatus, setMessagesStatus] = useState("LoadingFirstPage");
   const [activeTurn, setActiveTurn] = useState<{
     promptMessageId: string;
     order: number;
   } | null>(null);
   const [isStopping, setIsStopping] = useState(false);
-  const [preloadedTitle, setPreloadedTitle] = useState<string | null>(null);
+  const [preloadedTitle, setPreloadedTitle] = useState<string | null | undefined>(undefined);
   const { pending } = usePendingReply();
   const threadPending = pending?.threadId === threadId ? pending : null;
 
@@ -61,6 +68,7 @@ export function AgentThreadFrame({
     const trimmed = prompt.trim();
     if (!trimmed && attachments.length === 0) return;
     setIsSubmitting(true);
+    setComposerNotice(null);
     try {
       await sendMessage({
         threadId,
@@ -70,9 +78,19 @@ export function AgentThreadFrame({
       setPrompt("");
       setAttachments([]);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to send message",
-      );
+      const billing = error instanceof ConvexError ? billingNoticeForError(error.data) : null;
+      if (billing) {
+        setComposerNotice(billing);
+      } else {
+        const message =
+          error instanceof ConvexError &&
+          typeof (error.data as { message?: unknown })?.message === "string"
+            ? ((error.data as { message: string }).message)
+            : error instanceof Error
+              ? error.message
+              : "Failed to send message";
+        toast.error(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -103,6 +121,7 @@ export function AgentThreadFrame({
           <div className="flex h-full min-h-0 flex-col bg-agent-page-bg text-ink">
             <AgentChatHeader
               title={preloadedTitle ?? "New chat"}
+              titleLoading={preloadedTitle === undefined}
               showDropdown={false}
             />
             <div className="flex min-h-0 flex-1 flex-col">
@@ -110,9 +129,13 @@ export function AgentThreadFrame({
             </div>
             <div className="shrink-0 px-6 pb-5">
               <div className="mx-auto w-full max-w-178">
+                {composerNotice && <BillingNotice notice={composerNotice} />}
                 <AgentComposer
                   value={prompt}
-                  onChange={setPrompt}
+                  onChange={(value) => {
+                    setPrompt(value);
+                    if (composerNotice) setComposerNotice(null);
+                  }}
                   onSubmit={handleSubmit}
                   isSubmitting={isSubmitting}
                   isGenerating={activeTurn !== null}

@@ -50,7 +50,6 @@ export function Navbar() {
   if (
     pathname === "/login" ||
     pathname === "/create-workspace" ||
-    pathname.startsWith("/dashboard") ||
     pathname.startsWith("/documents") ||
     pathname.startsWith("/agent") ||
     pathname.startsWith("/profile") ||

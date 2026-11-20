@@ -3,18 +3,24 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useMutation } from "convex/react";
+import { ConvexError } from "convex/values";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { AgentChatHeader } from "@/components/agent/agent-chat-header";
 import { AgentComposer } from "@/components/agent/agent-composer";
 import { type ChatAttachment } from "@/lib/attachments";
 import { usePendingReply } from "@/components/agent/pending-reply-context";
+import {
+  BillingNotice,
+  billingNoticeForError,
+  type BillingNoticeData,
+} from "@/components/agent/billing-notice";
 
 export function AgentWorkspace() {
   const [prompt, setPrompt] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [inlineError, setInlineError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<BillingNoticeData | null>(null);
   const startThread = useMutation(api.chat.startThread);
   const router = useRouter();
   const { setPending } = usePendingReply();
@@ -23,7 +29,7 @@ export function AgentWorkspace() {
     const trimmed = prompt.trim();
     if (!trimmed && attachments.length === 0) return;
     setIsSubmitting(true);
-    setInlineError(null);
+    setNotice(null);
     try {
       const { threadId, messageId } = await startThread({
         prompt: trimmed,
@@ -39,10 +45,17 @@ export function AgentWorkspace() {
       setAttachments([]);
       router.replace(`/agent/${threadId}`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to start conversation";
-      if (message.toLowerCase().includes("wallet is empty")) {
-        setInlineError(message);
+      const billing = error instanceof ConvexError ? billingNoticeForError(error.data) : null;
+      if (billing) {
+        setNotice(billing);
       } else {
+        const message =
+          error instanceof ConvexError &&
+          typeof (error.data as { message?: unknown })?.message === "string"
+            ? ((error.data as { message: string }).message)
+            : error instanceof Error
+              ? error.message
+              : "Failed to start conversation";
         toast.error(message);
       }
     } finally {
@@ -58,29 +71,18 @@ export function AgentWorkspace() {
           <h1 className="mb-8 text-center text-3xl leading-none font-normal tracking-[-0.01em] text-ink">
             What do you need help with today?
           </h1>
+          {notice && <BillingNotice notice={notice} />}
           <AgentComposer
             value={prompt}
-            onChange={setPrompt}
+            onChange={(value) => {
+              setPrompt(value);
+              if (notice) setNotice(null);
+            }}
             onSubmit={handleSubmit}
             isSubmitting={isSubmitting}
             attachments={attachments}
             onAttachmentsChange={setAttachments}
           />
-          {inlineError && (
-            <div
-              role="alert"
-              className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#f1d7a8] bg-[#fff9ed] px-3 py-2.5 text-[13px] text-[#76510e]"
-            >
-              <span>{inlineError}</span>
-              <button
-                type="button"
-                onClick={() => router.push("/billing")}
-                className="shrink-0 rounded-md font-medium underline underline-offset-2"
-              >
-                Add credits
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -9,10 +9,8 @@ import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { z } from "zod";
 
-const DEFAULT_PORTAL_URL = "https://diper.ogunstate.gov.ng";
-
 const workspaceSchema = z.object({
-  portalUrl: z.union([z.literal(""), z.string().url("Enter a valid portal URL")]),
+  portalUrl: z.string().trim().min(1, "Enter your portal URL").url("Enter a valid portal URL"),
   email: z.string().trim().min(1, "Enter your email").email("Enter a valid email address"),
   password: z.string().min(1, "Enter your password"),
 });
@@ -66,7 +64,7 @@ export function WorkspaceForm() {
   } = useForm<WorkspaceFields>({
     resolver: zodResolver(workspaceSchema),
     defaultValues: {
-      portalUrl: DEFAULT_PORTAL_URL,
+      portalUrl: "",
       email: "",
       password: "",
     },
@@ -76,15 +74,14 @@ export function WorkspaceForm() {
     setServerError(null);
     try {
       await upsertConnection({
-        portalKey: "diper",
-        portalUrl: values.portalUrl || DEFAULT_PORTAL_URL,
+        portalUrl: values.portalUrl,
         portalEmail: values.email,
         password: values.password,
       });
       toast.success("Workspace connected", {
         description: "Your portal account is linked to this workspace.",
       });
-      router.replace("/dashboard");
+      router.replace("/agent");
     } catch (error) {
       setServerError(
         error instanceof Error ? error.message : "Could not link the portal account. Try again.",
@@ -119,10 +116,16 @@ export function WorkspaceForm() {
               {...register("portalUrl")}
               id="portalUrl"
               type="url"
-              placeholder="https://diper.ogunstate.gov.ng"
-              disabled
+              placeholder="https://portal.example.com/login"
+              aria-invalid={Boolean(errors.portalUrl)}
+              aria-describedby={errors.portalUrl ? "portal-url-error" : undefined}
               className={fieldClassName}
             />
+            {errors.portalUrl && (
+              <p id="portal-url-error" role="alert" className="mb-0 mt-2 text-[13px] text-danger-text">
+                {errors.portalUrl.message}
+              </p>
+            )}
           </div>
 
           <div>
