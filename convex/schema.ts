@@ -156,10 +156,13 @@ export default defineSchema({
     userId: v.id("users"),
     threadId: v.string(),
     title: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("draft"), v.literal("active"))),
     lastActivityAt: v.number(),
   })
     .index("by_thread", ["threadId"])
-    .index("by_user_activity", ["userId", "lastActivityAt"]),
+    .index("by_user_activity", ["userId", "lastActivityAt"])
+    .index("by_user_status_activity", ["userId", "status", "lastActivityAt"])
+    .index("by_status_activity", ["status", "lastActivityAt"]),
 
   messageAttachments: defineTable({
     messageId: v.string(),

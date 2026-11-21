@@ -25,7 +25,6 @@ export function ChatHistoryRow({ threadId, name }: ChatHistoryRowProps) {
     startRenaming,
     cancelRenaming,
     saveRenaming,
-    markNavigation,
   } = useChatHistoryRowActions(threadId, name, rowRef);
 
   return (
@@ -55,7 +54,6 @@ export function ChatHistoryRow({ threadId, name }: ChatHistoryRowProps) {
           <SidebarLink
             href={`/agent/${threadId}`}
             active={isActive}
-            onClick={markNavigation}
             onMouseEnter={prefetchThread}
             onFocus={prefetchThread}
             className="pr-9"

@@ -14,7 +14,6 @@ import { useElapsed } from "@/components/agent/activity-row";
 import { ShimmerText } from "@/components/agent/shimmer";
 import { PreviewModal } from "@/components/agent/preview-modal";
 import { partText, type UIMessagePartList } from "@/components/agent/parts";
-import { usePendingReply } from "@/components/agent/pending-reply-context";
 import {
   useCachedThreadMessages,
   type CachedThreadMessage,
@@ -103,13 +102,6 @@ export function AgentThread({ threadId }: { threadId: string }) {
     setTitle(summary.title ?? null);
   }, [summary, setTitle]);
 
-  const { pending, clearPending, navigation } = usePendingReply();
-  const threadPending = pending?.threadId === threadId ? pending : null;
-  const showInitialLoading =
-    navigation?.threadId === threadId
-      ? navigation.source === "history"
-      : !threadPending;
-
   const results = useMemo(() => {
     const byKey = new Map<string, ThreadMessageView>();
     for (const message of cachedThread.messages) {
@@ -134,12 +126,6 @@ export function AgentThread({ threadId }: { threadId: string }) {
         : messages.status,
     );
   }, [cachedThread.isLoading, messages.status, setStatus]);
-
-  useEffect(() => {
-    if (!threadPending || !cacheScope) return;
-    const userLanded = results.some((message) => message.id === threadPending.messageId);
-    if (userLanded) clearPending();
-  }, [cacheScope, threadPending, results, clearPending]);
 
   useEffect(() => {
     if (messages.status === "CanLoadMore") messages.loadMore(30);
@@ -182,27 +168,8 @@ export function AgentThread({ threadId }: { threadId: string }) {
     );
   }, [activeOrder, activePromptMessageId, setActiveTurn]);
 
-  const displayedResults = [...results];
-  if (
-    threadPending &&
-    !displayedResults.some((message) => message.id === threadPending.messageId)
-  ) {
-    displayedResults.push({
-      id: threadPending.messageId,
-      key: threadPending.messageId,
-      role: "user",
-      text: threadPending.prompt,
-      parts: [{ type: "text", text: threadPending.prompt }],
-      order: Number.MAX_SAFE_INTEGER,
-      stepOrder: 0,
-      status: "pending",
-      _creationTime: 0,
-      attachments: threadPending.attachments,
-    });
-  }
-
   const userOrders = new Set(
-    displayedResults
+    results
       .filter((message) => message.role === "user")
       .map((message) => message.order)
       .filter((order): order is number => typeof order === "number"),
@@ -215,7 +182,7 @@ export function AgentThread({ threadId }: { threadId: string }) {
           scrollClassName="overflow-y-auto px-6 py-6"
           className="mx-auto flex min-h-full w-full max-w-178 flex-col gap-6"
         >
-          {displayedResults.map((message) => {
+          {results.map((message) => {
             const isUser = message.role === "user";
             if (!isUser && typeof message.order === "number" && userOrders.has(message.order)) {
               return null;
@@ -249,13 +216,11 @@ export function AgentThread({ threadId }: { threadId: string }) {
               typeof message.order === "number" ? resultsByOrder.get(message.order) : undefined;
             const assistantParts = (assistant?.parts ?? []) as UIMessagePartList;
             const timing = timingByPromptId.get(message.id);
-            const isPendingTurn =
-              message.id === threadPending?.messageId ||
-              (!assistant && message.id === lastMessage?.id);
             const isStreaming =
               assistant?.status === "streaming" ||
               timing?.status === "running" ||
-              Boolean(isPendingTurn);
+              message.status === "pending" ||
+              (!assistant && message.id === lastMessage?.id);
 
             return (
               <div key={message.id} className="flex w-full flex-col gap-4 items-end">
@@ -299,8 +264,6 @@ export function AgentThread({ threadId }: { threadId: string }) {
           })}
           {messages.status === "LoadingFirstPage" &&
             cachedThread.isLoading &&
-            !threadPending &&
-            showInitialLoading &&
             results.length === 0 && <ThreadLoading />}
         </StickToBottom.Content>
       </StickToBottom>

@@ -19,6 +19,8 @@ import type * as browserUse from "../browserUse.js";
 import type * as browserUseJobs from "../browserUseJobs.js";
 import type * as chat from "../chat.js";
 import type * as chatActions from "../chatActions.js";
+import type * as cleanup from "../cleanup.js";
+import type * as crons from "../crons.js";
 import type * as documents from "../documents.js";
 import type * as encryption from "../encryption.js";
 import type * as http from "../http.js";
@@ -47,6 +49,8 @@ declare const fullApi: ApiFromModules<{
   browserUseJobs: typeof browserUseJobs;
   chat: typeof chat;
   chatActions: typeof chatActions;
+  cleanup: typeof cleanup;
+  crons: typeof crons;
   documents: typeof documents;
   encryption: typeof encryption;
   http: typeof http;
