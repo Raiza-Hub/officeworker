@@ -12,6 +12,9 @@ import {
 import { toast } from "sonner";
 import {
   attachmentFingerprint,
+  deleteUploadedObject,
+  isUploadCanceledError,
+  UploadCanceledError,
   uploadChatAttachment,
   type ChatAttachment,
 } from "@/lib/attachments";
@@ -27,6 +30,13 @@ type PendingAttachment = {
   name: string;
   mediaType: string;
   size: number;
+  controller: AbortController;
+};
+
+type PendingUpload = {
+  id: string;
+  file: File;
+  controller: AbortController;
 };
 
 type AgentComposerProps = {
@@ -60,34 +70,44 @@ function collectAcceptedFiles(files: File[], knownFingerprints: Set<string>) {
   });
 }
 
-function toPendingAttachment(file: File): PendingAttachment {
+function toPendingUpload(file: File): PendingUpload {
   return {
     id: crypto.randomUUID(),
-    name: file.name,
-    mediaType: file.type || "application/octet-stream",
-    size: file.size,
+    file,
+    controller: new AbortController(),
   };
 }
 
 async function uploadAcceptedFiles(
-  acceptedFiles: File[],
+  pendingUploads: PendingUpload[],
   onAttachmentsChange: Dispatch<SetStateAction<ChatAttachment[]>>,
 ) {
   const uploaded = await Promise.allSettled(
-    acceptedFiles.map((file) => uploadChatAttachment(file)),
+    pendingUploads.map(({ file, controller }) =>
+      uploadChatAttachment(file, controller.signal),
+    ),
   );
-  const ok = uploaded
-    .filter(
-      (result): result is PromiseFulfilledResult<ChatAttachment> =>
-        result.status === "fulfilled",
-    )
-    .map((result) => result.value);
-  for (const result of uploaded) {
-    if (result.status === "rejected") {
-      toast.error(
-        result.reason instanceof Error ? result.reason.message : "Upload failed",
-      );
+  const ok: ChatAttachment[] = [];
+  const cleanupPromises: Promise<void>[] = [];
+  for (const [index, result] of uploaded.entries()) {
+    const controller = pendingUploads[index]?.controller;
+    if (result.status === "fulfilled") {
+      if (controller?.signal.aborted) {
+        cleanupPromises.push(deleteUploadedObject(result.value.key));
+      } else {
+        ok.push(result.value);
+      }
+      continue;
     }
+    if (controller?.signal.aborted || isUploadCanceledError(result.reason)) {
+      continue;
+    }
+    toast.error(
+      result.reason instanceof Error ? result.reason.message : "Upload failed",
+    );
+  }
+  if (cleanupPromises.length > 0) {
+    await Promise.all(cleanupPromises);
   }
   if (ok.length > 0) {
     onAttachmentsChange((current) => [...current, ...ok]);
@@ -99,11 +119,13 @@ function ComposerAttachmentList({
   pendingAttachments,
   onPreview,
   onRemove,
+  onCancel,
 }: {
   attachments: ChatAttachment[];
   pendingAttachments: PendingAttachment[];
   onPreview: (attachment: ChatAttachment) => void;
   onRemove: (key: string) => void;
+  onCancel: (id: string) => void;
 }) {
   if (attachments.length === 0 && pendingAttachments.length === 0) return null;
   return (
@@ -122,7 +144,11 @@ function ComposerAttachmentList({
       ))}
       {pendingAttachments.map((attachment) => (
         <li key={attachment.id}>
-          <AttachmentThumbnail attachment={attachment} isUploading />
+          <AttachmentThumbnail
+            attachment={attachment}
+            isUploading
+            onCancel={() => onCancel(attachment.id)}
+          />
         </li>
       ))}
     </ul>
@@ -208,16 +234,30 @@ export function AgentComposer({
     const acceptedFiles = collectAcceptedFiles(files, knownFingerprints);
     if (acceptedFiles.length === 0) return;
 
-    const pending = acceptedFiles.map(toPendingAttachment);
+    const pendingUploads = acceptedFiles.map(toPendingUpload);
+    const pending = pendingUploads.map(({ id, file, controller }) => ({
+      id,
+      controller,
+      name: file.name,
+      mediaType: file.type || "application/octet-stream",
+      size: file.size,
+    }));
     const pendingIds = new Set(pending.map((attachment) => attachment.id));
     setPendingAttachments((current) => [...current, ...pending]);
     try {
-      await uploadAcceptedFiles(acceptedFiles, onAttachmentsChange);
+      await uploadAcceptedFiles(pendingUploads, onAttachmentsChange);
     } finally {
       setPendingAttachments((current) =>
         current.filter((attachment) => !pendingIds.has(attachment.id)),
       );
     }
+  }
+
+  function cancelPendingAttachment(id: string) {
+    const attachment = pendingAttachments.find((item) => item.id === id);
+    if (!attachment) return;
+    attachment.controller.abort(new UploadCanceledError());
+    setPendingAttachments((current) => current.filter((item) => item.id !== id));
   }
 
   const canSend =
@@ -245,6 +285,7 @@ export function AgentComposer({
               current.filter((candidate) => candidate.key !== key),
             )
           }
+          onCancel={cancelPendingAttachment}
         />
         <textarea
           ref={textareaRef}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import { api } from "@/convex/_generated/api";
 import { AgentChatHeader } from "@/components/agent/agent-chat-header";
 import { AgentComposer } from "@/components/agent/agent-composer";
 import { type ChatAttachment } from "@/lib/attachments";
-import { usePendingReply } from "@/components/agent/pending-reply-context";
+import { useChatStore, useEnsureDraft } from "@/lib/chat-store";
 import {
   BillingNotice,
   billingNoticeForError,
@@ -21,9 +21,15 @@ export function AgentWorkspace() {
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState<BillingNoticeData | null>(null);
-  const startThread = useMutation(api.chat.startThread);
+  const sendMessage = useMutation(api.chat.sendMessage);
+  const ensureDraft = useEnsureDraft();
+  const clearDraft = useChatStore((state) => state.clearDraft);
+  const newChatToken = useChatStore((state) => state.newChatToken);
   const router = useRouter();
-  const { setPending } = usePendingReply();
+
+  useEffect(() => {
+    void ensureDraft().catch(() => {});
+  }, [ensureDraft]);
 
   async function handleSubmit() {
     const trimmed = prompt.trim();
@@ -31,20 +37,20 @@ export function AgentWorkspace() {
     setIsSubmitting(true);
     setNotice(null);
     try {
-      const { threadId, messageId } = await startThread({
+      const threadId = await ensureDraft();
+      await sendMessage({
+        threadId,
         prompt: trimmed,
         attachments: attachments.length > 0 ? attachments : undefined,
       });
-      setPending({
-        threadId,
-        messageId,
-        prompt: trimmed,
-        attachments,
-      });
+      clearDraft(newChatToken);
       setPrompt("");
       setAttachments([]);
       router.replace(`/agent/${threadId}`);
     } catch (error) {
+      if (error instanceof Error && error.message === "Thread not found") {
+        clearDraft();
+      }
       const billing = error instanceof ConvexError ? billingNoticeForError(error.data) : null;
       if (billing) {
         setNotice(billing);

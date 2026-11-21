@@ -1,5 +1,5 @@
-import { AgentWorkspace } from "@/components/agent/agent-workspace";
+import { AgentWorkspaceHost } from "@/components/agent/agent-workspace-host";
 
 export default function AgentPage() {
-  return <AgentWorkspace />;
+  return <AgentWorkspaceHost />;
 }

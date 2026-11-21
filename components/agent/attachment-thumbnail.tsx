@@ -169,7 +169,25 @@ export function AttachmentThumbnail({
           {preview}
         </div>
       )}
-      {isUploading && progress === null ? (
+      {isUploading && progress === null && onCancel ? (
+        <span className="group/spinner absolute top-1 right-1 inline-flex size-5 items-center justify-center">
+          <span
+            role="status"
+            aria-label={`Uploading ${attachment.name}`}
+            className="inline-flex size-5 items-center justify-center rounded-full bg-white/90 text-primary shadow-sm transition-opacity group-hover/spinner:opacity-0 group-focus-within/spinner:opacity-0"
+          >
+            <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" />
+          </span>
+          <button
+            type="button"
+            aria-label={`Cancel uploading ${attachment.name}`}
+            onClick={onCancel}
+            className="absolute inset-0 inline-flex size-5 items-center justify-center rounded-full bg-text-secondary text-white opacity-0 shadow-sm transition-opacity hover:bg-secondary-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 group-hover/spinner:opacity-100 group-focus-within/spinner:opacity-100"
+          >
+            <X aria-hidden="true" className="size-3" strokeWidth={2.2} />
+          </button>
+        </span>
+      ) : isUploading && progress === null ? (
         <span
           role="status"
           aria-label={`Uploading ${attachment.name}`}

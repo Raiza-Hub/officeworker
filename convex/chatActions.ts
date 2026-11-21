@@ -9,6 +9,7 @@ import { components } from "./_generated/api";
 import ExcelJS from "exceljs";
 import Papa from "papaparse";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   abortStream,
   getThreadMetadata,
@@ -29,6 +30,30 @@ type Attachment = {
   mediaType: string;
   size: number;
 };
+
+const INLINE_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MODEL_FILE_URL_TTL_SECONDS = 15 * 60;
+
+function isPdfAttachment(attachment: Attachment): boolean {
+  return (
+    attachment.mediaType === "application/pdf" || /\.pdf$/i.test(attachment.name)
+  );
+}
+
+async function signObjectReadUrl(attachment: Attachment): Promise<string> {
+  const config = getR2Config();
+  if (!config) throw new Error("R2 is not configured");
+  const filename = attachment.name.replace(/[^a-zA-Z0-9._-]/g, "_") || "file";
+  return getSignedUrl(
+    createR2Client(config),
+    new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: attachment.key,
+      ResponseContentDisposition: `inline; filename="${filename}"`,
+    }),
+    { expiresIn: MODEL_FILE_URL_TTL_SECONDS },
+  );
+}
 
 export async function fetchObjectBytes(key: string): Promise<Uint8Array> {
   const config = getR2Config();
@@ -117,9 +142,9 @@ async function buildAttachmentMessages(
 
       const inline =
         attachment.mediaType.startsWith("image/") ||
-        attachment.mediaType === "application/pdf";
+        isPdfAttachment(attachment);
 
-      if (inline && attachment.size <= 10 * 1024 * 1024) {
+      if (inline && attachment.size <= INLINE_ATTACHMENT_BYTES) {
         const bytes = await fetchObjectBytes(attachment.key);
         return {
           kind: "file" as const,
@@ -130,6 +155,26 @@ async function buildAttachmentMessages(
             filename: attachment.name,
           },
         };
+      }
+
+      if (inline) {
+        try {
+          const url = await signObjectReadUrl(attachment);
+          return {
+            kind: "file" as const,
+            part: {
+              type: "file" as const,
+              data: { type: "url" as const, url: new URL(url) },
+              mediaType: attachment.mediaType,
+              filename: attachment.name,
+            },
+          };
+        } catch (error) {
+          console.error("attachment url signing failed", {
+            key: attachment.key,
+            error,
+          });
+        }
       }
 
       return {
@@ -191,6 +236,12 @@ export const generateReply = internalAction({
         args.attachments.length > 0
           ? await buildAttachmentMessages(args.attachments)
           : [];
+      const fileParserModel =
+        args.attachments.some(isPdfAttachment) && process.env.AI_MODEL
+          ? openrouter.chat(process.env.AI_MODEL, {
+              plugins: [{ id: "file-parser" }],
+            })
+          : undefined;
 
       startedAt = await ctx.runMutation(internal.chat.recordTurnStarted, {
         threadId: args.threadId,
@@ -208,6 +259,7 @@ export const generateReply = internalAction({
         {
           promptMessageId: args.promptMessageId,
           messages: attachmentMessages,
+          model: fileParserModel,
           onError: () => {
             streamState.finalizedByAgent = true;
           },

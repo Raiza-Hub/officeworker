@@ -45,74 +45,35 @@ async function authorizeThreadAccess(
   return userId;
 }
 
-// New chat: create thread + save the first user message + schedule generation.
-// The client redirects to /agent/[threadId] immediately; the reply streams in.
-export const startThread = mutation({
-  args: {
-    prompt: v.string(),
-    attachments: v.optional(
-      v.array(
-        v.object({
-          key: v.string(),
-          name: v.string(),
-          mediaType: v.string(),
-          size: v.number(),
-        }),
-      ),
-    ),
-  },
-  handler: async (ctx, args) => {
+// Hidden draft created as soon as the user starts a new chat. The first real
+// send promotes it to an active thread and schedules title + reply generation.
+export const createDraftThread = mutation({
+  args: {},
+  handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("Not authenticated");
-    const wallet = await ctx.db
-      .query("wallets")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+
+    const existing = await ctx.db
+      .query("threadActivity")
+      .withIndex("by_user_status_activity", (q) =>
+        q.eq("userId", userId).eq("status", "draft"),
+      )
+      .order("desc")
       .first();
-    const available = Math.max(0, (wallet?.balance ?? 0) - (wallet?.reserved ?? 0));
-    if (available <= 0) {
-      throw new ConvexError({
-        code: "WALLET_EMPTY",
-        context: "start",
-        message: "You’re out of credits. Add credits to start a chat.",
-      });
-    }
-    const prompt = args.prompt.trim();
-    if (!prompt && (!args.attachments || args.attachments.length === 0)) {
-      throw new Error("Message is empty");
+    if (existing) {
+      await ctx.db.patch(existing._id, { lastActivityAt: Date.now() });
+      return { threadId: existing.threadId };
     }
 
     const threadId = await createThread(ctx, components.agent, { userId });
-    const { messageId } = await saveMessage(ctx, components.agent, {
-      threadId,
-      prompt,
-    });
     await ctx.db.insert("threadActivity", {
       userId,
       threadId,
+      status: "draft",
+      title: "",
       lastActivityAt: Date.now(),
     });
-    await Promise.all(
-      (args.attachments ?? []).map((attachment) =>
-        ctx.db.insert("messageAttachments", {
-          messageId,
-          threadId,
-          key: attachment.key,
-          name: attachment.name,
-          mediaType: attachment.mediaType,
-          size: attachment.size,
-        }),
-      ),
-    );
-    await ctx.scheduler.runAfter(0, internal.chatActions.generateThreadTitle, {
-      threadId,
-      promptText: prompt.slice(0, MAX_TITLE_PROMPT_CHARS),
-    });
-    await ctx.scheduler.runAfter(0, internal.chatActions.generateReply, {
-      threadId,
-      promptMessageId: messageId,
-      attachments: args.attachments ?? [],
-    });
-    return { threadId, messageId };
+    return { threadId };
   },
 });
 
@@ -134,6 +95,11 @@ export const sendMessage = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await authorizeThreadAccess(ctx, args.threadId);
+    const activity = await ctx.db
+      .query("threadActivity")
+      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+      .first();
+    const isFirstMessage = activity?.status === "draft";
     const prompt = args.prompt.trim();
     if (!prompt && (!args.attachments || args.attachments.length === 0)) {
       throw new Error("Message is empty");
@@ -168,12 +134,17 @@ export const sendMessage = mutation({
         }),
       ),
     );
-    const activity = await ctx.db
-      .query("threadActivity")
-      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-      .first();
     if (activity !== null) {
-      await ctx.db.patch(activity._id, { lastActivityAt: Date.now() });
+      await ctx.db.patch(activity._id, {
+        status: "active",
+        lastActivityAt: Date.now(),
+      });
+    }
+    if (isFirstMessage) {
+      await ctx.scheduler.runAfter(0, internal.chatActions.generateThreadTitle, {
+        threadId: args.threadId,
+        promptText: prompt.slice(0, MAX_TITLE_PROMPT_CHARS),
+      });
     }
 
     await ctx.scheduler.runAfter(0, internal.chatActions.generateReply, {
@@ -321,6 +292,7 @@ export const listThreads = query({
     return await ctx.db
       .query("threadActivity")
       .withIndex("by_user_activity", (q) => q.eq("userId", userId))
+      .filter((q) => q.neq(q.field("status"), "draft"))
       .order("desc")
       .paginate(args.paginationOpts);
   },

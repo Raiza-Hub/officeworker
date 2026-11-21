@@ -1,7 +1,7 @@
 import { readResponseError } from "@/lib/api-client";
 import { BLOCKED_MEDIA_MESSAGE, isBlockedMediaFile } from "@/lib/blocked-media";
 
-export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+export const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 export const MULTIPART_THRESHOLD_BYTES = 5 * 1024 * 1024;
 export const DEFAULT_PART_SIZE_BYTES = 8 * 1024 * 1024;
 
@@ -33,6 +33,13 @@ export class UploadCanceledError extends Error {
     super(message);
     this.name = "UploadCanceledError";
   }
+}
+
+export function isUploadCanceledError(error: unknown): boolean {
+  return (
+    error instanceof UploadCanceledError ||
+    (error instanceof DOMException && error.name === "AbortError")
+  );
 }
 
 export function attachmentFingerprint(file: {
@@ -176,20 +183,70 @@ export function putObjectToR2WithProgress(
   });
 }
 
-export async function uploadChatAttachment(file: File): Promise<ChatAttachment> {
+export async function deleteUploadedObject(storageKey: string) {
+  await fetch("/api/documents/object", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key: storageKey }),
+  }).catch(() => undefined);
+}
+
+async function cleanupChatUpload(key: string, uploadId?: string) {
+  if (uploadId) await abortMultipartUpload(key, uploadId);
+  await deleteUploadedObject(key);
+}
+
+export async function uploadChatAttachment(
+  file: File,
+  signal?: AbortSignal,
+): Promise<ChatAttachment> {
   if (file.size > MAX_ATTACHMENT_BYTES) {
-    throw new Error(`"${file.name}" is larger than 25MB`);
+    throw new Error(`"${file.name}" is larger than 100MB`);
   }
   if (isBlockedMediaFile(file)) {
     throw new Error(BLOCKED_MEDIA_MESSAGE);
   }
   const contentType = file.type || "application/octet-stream";
-  const presign = await presignUpload({
-    name: file.name,
-    size: file.size,
-    type: contentType,
-  });
-  await putObjectToR2(presign.url, file, contentType);
+  const presign = await presignDocumentUpload(
+    {
+      name: file.name,
+      size: file.size,
+      type: contentType,
+    },
+    signal,
+  );
+
+  try {
+    if (presign.mode === "multipart") {
+      await uploadMultipartResumable({
+        file,
+        key: presign.key,
+        uploadId: presign.uploadId,
+        contentType,
+        partSize: presign.partSize,
+        partUrls: presign.partUrls,
+        uploadedParts: [],
+        onProgress: () => {},
+        signal,
+      });
+      await completeMultipartUpload(presign.key, presign.uploadId);
+    } else {
+      await putObjectToR2WithProgress(
+        presign.url,
+        file,
+        contentType,
+        () => {},
+        signal,
+      );
+    }
+  } catch (error) {
+    await cleanupChatUpload(
+      presign.key,
+      presign.mode === "multipart" ? presign.uploadId : undefined,
+    );
+    throw error;
+  }
+
   return {
     key: presign.key,
     name: file.name,

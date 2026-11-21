@@ -19,6 +19,7 @@ import { ChatHistorySection } from "@/components/chat-history/chat-history-secti
 import { useSidebar } from "@/components/sidebar/sidebar-context";
 import { SidebarLink, sidebarLinkFocusRingClassName } from "@/components/sidebar/sidebar-link";
 import { SidebarTrigger } from "@/components/sidebar/sidebar-trigger";
+import { useChatStore } from "@/lib/chat-store";
 
 type SidebarItem = {
   label: string;
@@ -48,13 +49,20 @@ function getInitials(name: string) {
 function SidebarNavLink({
   item,
   active,
+  onClick,
 }: {
   item: SidebarItem;
   active: boolean;
+  onClick?: () => void;
 }) {
   const Icon = item.icon;
   return (
-    <SidebarLink href={item.href} active={active} aria-label={item.label}>
+    <SidebarLink
+      href={item.href}
+      active={active}
+      aria-label={item.label}
+      onClick={onClick}
+    >
       <Icon
         aria-hidden="true"
         className="size-3.5 shrink-0"
@@ -69,6 +77,7 @@ export function SidebarNavContent() {
   const pathname = usePathname();
   const { isAuthenticated } = useConvexAuth();
   const { isMobile } = useSidebar();
+  const startNewChat = useChatStore((state) => state.startNewChat);
   const [settingsExpanded, setSettingsExpanded] = useState(true);
   const currentUser = useQuery(
     api.users.current,
@@ -148,6 +157,7 @@ export function SidebarNavContent() {
             key={item.label}
             item={item}
             active={item.href === pathname || pathname.startsWith(`${item.href}/`)}
+            onClick={item.href === "/agent" ? startNewChat : undefined}
           />
         ))}
       </nav>

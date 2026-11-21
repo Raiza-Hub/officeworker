@@ -12,7 +12,6 @@ import { type ChatAttachment } from "@/lib/attachments";
 import {
   ComposerPrefillContext,
 } from "@/components/agent/composer-context";
-import { usePendingReply } from "@/components/agent/pending-reply-context";
 import {
   MessagesStatusContext,
   ThreadTitleContext,
@@ -41,8 +40,6 @@ export function AgentThreadFrame({
   } | null>(null);
   const [isStopping, setIsStopping] = useState(false);
   const [preloadedTitle, setPreloadedTitle] = useState<string | null | undefined>(undefined);
-  const { pending } = usePendingReply();
-  const threadPending = pending?.threadId === threadId ? pending : null;
 
   const sendMessage = useMutation(api.chat.sendMessage).withOptimisticUpdate(
     (store, args) =>
@@ -141,7 +138,7 @@ export function AgentThreadFrame({
                   isGenerating={activeTurn !== null}
                   isStopping={isStopping}
                   onStop={() => void handleStop()}
-                  loading={messagesStatus === "LoadingFirstPage" && !threadPending}
+                  loading={messagesStatus === "LoadingFirstPage"}
                   attachments={attachments}
                   onAttachmentsChange={setAttachments}
                 />

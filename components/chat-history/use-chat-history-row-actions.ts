@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { useMutation } from "convex/react";
 import { optimisticallyUpdateValueInPaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { usePendingReply } from "@/components/agent/pending-reply-context";
 
 export function useChatHistoryRowActions(
   threadId: string,
@@ -15,7 +14,6 @@ export function useChatHistoryRowActions(
 ) {
   const router = useRouter();
   const pathname = usePathname();
-  const { markHistoryNavigation } = usePendingReply();
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftName, setDraftName] = useState(name);
 
@@ -100,10 +98,6 @@ export function useChatHistoryRowActions(
     );
   }
 
-  function markNavigation() {
-    markHistoryNavigation(threadId);
-  }
-
   return {
     isActive,
     isRenaming,
@@ -114,6 +108,5 @@ export function useChatHistoryRowActions(
     startRenaming,
     cancelRenaming,
     saveRenaming,
-    markNavigation,
   };
 }
