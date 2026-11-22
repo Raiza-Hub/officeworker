@@ -5,28 +5,25 @@ import { useQuery } from "convex-helpers/react/cache";
 import { useConvexConnectionState } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useMessagesStatus, useThreadTitle } from "@/components/agent/thread-contexts";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Loader } from "lucide-react";
 import { StickToBottom } from "use-stick-to-bottom";
 import { SubmissionCard } from "@/components/agent/submission-card";
 import { Reasoning } from "@/components/agent/reasoning";
 import { useElapsed } from "@/components/agent/activity-row";
 import { ShimmerText } from "@/components/agent/shimmer";
-import { PreviewModal } from "@/components/agent/preview-modal";
 import { partText, type UIMessagePartList } from "@/components/agent/parts";
 import {
   useCachedThreadMessages,
   type CachedThreadMessage,
 } from "@/components/agent/thread-history-cache";
+import { type OptimisticFirstMessage } from "@/components/agent/optimistic-first-message";
 import { extractSubmissionIds, finalAssistantParts, historyMessageKey } from "./thread-helpers";
-import { AssistantMessage, UserAttachments } from "./thread-message-parts";
-
-type Attachment = {
-  key: string;
-  name: string;
-  mediaType: string;
-  size: number;
-};
+import {
+  AssistantMessage,
+  UserAttachments,
+  type PreviewAttachment,
+} from "./thread-message-parts";
 
 type ThreadMessageView = CachedThreadMessage;
 
@@ -73,8 +70,17 @@ export function ThreadLoading() {
   );
 }
 
-export function AgentThread({ threadId }: { threadId: string }) {
-  const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
+export function AgentThread({
+  threadId,
+  optimisticFirstMessage,
+  onOptimisticResolved,
+  onPreview,
+}: {
+  threadId: string;
+  optimisticFirstMessage?: OptimisticFirstMessage | null;
+  onOptimisticResolved?: () => void;
+  onPreview: (attachment: PreviewAttachment) => void;
+}) {
   const connectionState = useConvexConnectionState();
   const isReconnecting =
     connectionState.hasEverConnected && !connectionState.isWebSocketConnected;
@@ -102,7 +108,7 @@ export function AgentThread({ threadId }: { threadId: string }) {
     setTitle(summary.title ?? null);
   }, [summary, setTitle]);
 
-  const results = useMemo(() => {
+  const realResults = useMemo(() => {
     const byKey = new Map<string, ThreadMessageView>();
     for (const message of cachedThread.messages) {
       byKey.set(historyMessageKey(message), message as ThreadMessageView);
@@ -116,6 +122,40 @@ export function AgentThread({ threadId }: { threadId: string }) {
         (a.stepOrder ?? 0) - (b.stepOrder ?? 0),
     );
   }, [cachedThread.messages, messages.results]);
+
+  const results = useMemo(() => {
+    if (!optimisticFirstMessage) return realResults;
+    if (
+      optimisticFirstMessage.messageId &&
+      realResults.some((message) => message.id === optimisticFirstMessage.messageId)
+    ) {
+      return realResults;
+    }
+    const optimisticView = {
+      id: optimisticFirstMessage.messageId ?? optimisticFirstMessage.tempId,
+      _creationTime: optimisticFirstMessage.createdAt,
+      role: "user",
+      status: "pending",
+      text: optimisticFirstMessage.prompt,
+      parts: optimisticFirstMessage.prompt
+        ? [{ type: "text", text: optimisticFirstMessage.prompt, state: "done" }]
+        : [],
+      attachments: optimisticFirstMessage.attachments,
+      key: `optimistic:${optimisticFirstMessage.tempId}`,
+    } as ThreadMessageView;
+    return [...realResults, optimisticView].sort(
+      (a, b) =>
+        (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER) ||
+        (a.stepOrder ?? 0) - (b.stepOrder ?? 0),
+    );
+  }, [optimisticFirstMessage, realResults]);
+
+  useEffect(() => {
+    if (!optimisticFirstMessage?.messageId) return;
+    if (realResults.some((message) => message.id === optimisticFirstMessage.messageId)) {
+      onOptimisticResolved?.();
+    }
+  }, [onOptimisticResolved, optimisticFirstMessage, realResults]);
 
   const lastMessage = results[results.length - 1];
 
@@ -190,7 +230,7 @@ export function AgentThread({ threadId }: { threadId: string }) {
             const parts = (message.parts ?? []) as UIMessagePartList;
             const submissionIds = isUser ? [] : extractSubmissionIds(parts);
             const attachments = Array.isArray((message as { attachments?: unknown }).attachments)
-              ? ((message as { attachments?: Attachment[] }).attachments ?? [])
+              ? ((message as { attachments?: PreviewAttachment[] }).attachments ?? [])
               : [];
 
             if (!isUser) {
@@ -226,7 +266,7 @@ export function AgentThread({ threadId }: { threadId: string }) {
               <div key={message.id} className="flex w-full flex-col gap-4 items-end">
                 <div className="max-w-[80%] rounded-[14px] rounded-br-sm bg-primary px-3.5 py-2.5 text-sm leading-5.5 text-white">
                   <p className="m-0 whitespace-pre-wrap">{parts.map(partText).join("")}</p>
-                  <UserAttachments attachments={attachments} onPreview={setPreviewAttachment} />
+                  <UserAttachments attachments={attachments} onPreview={onPreview} />
                 </div>
                 <div className="w-full self-start" key={`turn:${message.id}`}>
                   <div className={assistant ? "mb-2.5" : ""}>
@@ -264,15 +304,10 @@ export function AgentThread({ threadId }: { threadId: string }) {
           })}
           {messages.status === "LoadingFirstPage" &&
             cachedThread.isLoading &&
-            results.length === 0 && <ThreadLoading />}
+            results.length === 0 &&
+            !optimisticFirstMessage && <ThreadLoading />}
         </StickToBottom.Content>
       </StickToBottom>
-      <PreviewModal
-        storageKey={previewAttachment?.key ?? null}
-        filename={previewAttachment?.name ?? ""}
-        mediaType={previewAttachment?.mediaType}
-        onClose={() => setPreviewAttachment(null)}
-      />
     </div>
   );
 }
