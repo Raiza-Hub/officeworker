@@ -25,7 +25,7 @@ export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
   const hasSession = Boolean(await convexAuth.getToken());
 
   if (isLogin && hasSession) {
-    return nextjsMiddlewareRedirect(request, "/create-workspace");
+    return nextjsMiddlewareRedirect(request, "/agent");
   }
 
   if (isProtected && !hasSession) {

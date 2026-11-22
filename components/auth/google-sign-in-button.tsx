@@ -13,7 +13,7 @@ export function GoogleSignInButton() {
     setError(null);
 
     try {
-      await signIn("google", { redirectTo: "/create-workspace" });
+      await signIn("google", { redirectTo: "/agent" });
     } catch {
       setError("Could not start Google sign-in. Please try again.");
       setIsPending(false);
