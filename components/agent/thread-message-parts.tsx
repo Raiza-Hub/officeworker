@@ -7,12 +7,14 @@ import { AttachmentThumbnail } from "@/components/agent/attachment-thumbnail";
 import { type UIMessagePartList } from "@/components/agent/parts";
 import { buildEntries, extractSubmissionIds } from "./thread-helpers";
 
-type Attachment = {
+export type PreviewAttachment = {
   key: string;
   name: string;
   mediaType: string;
   size: number;
 };
+
+type Attachment = PreviewAttachment;
 
 export function TextPart({ text }: { text: string }) {
   const [smoothText] = useSmoothText(text);

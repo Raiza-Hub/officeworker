@@ -156,7 +156,7 @@ export function SidebarNavContent() {
           <SidebarNavLink
             key={item.label}
             item={item}
-            active={item.href === pathname || pathname.startsWith(`${item.href}/`)}
+            active={item.href === pathname}
             onClick={item.href === "/agent" ? startNewChat : undefined}
           />
         ))}

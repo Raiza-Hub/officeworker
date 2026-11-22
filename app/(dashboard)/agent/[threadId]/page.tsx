@@ -1,6 +1,5 @@
 import { Suspense } from "react";
-import { AgentThreadFrame } from "@/components/agent/agent-thread-page";
-import { AgentThread } from "@/components/agent/agent-thread";
+import { AgentChat } from "@/components/agent/agent-chat";
 
 export default function Page({
   params,
@@ -20,9 +19,5 @@ async function ThreadRoute({
   params: Promise<{ threadId: string }>;
 }) {
   const { threadId } = await params;
-  return (
-    <AgentThreadFrame key={threadId} threadId={threadId}>
-      <AgentThread threadId={threadId} />
-    </AgentThreadFrame>
-  );
+  return <AgentChat key={threadId} threadId={threadId} />;
 }
