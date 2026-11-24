@@ -28,6 +28,9 @@ const browserJobValidator = v.object({
   lastError: v.optional(v.string()),
   resultSummary: v.optional(v.string()),
   syncDisabled: v.optional(v.boolean()),
+  reservationId: v.optional(v.id("usageReservations")),
+  providerCostUsd: v.optional(v.number()),
+  billingSettled: v.optional(v.boolean()),
 });
 
 const artifactFileValidator = v.object({
@@ -37,6 +40,22 @@ const artifactFileValidator = v.object({
   sourcePath: v.optional(v.string()),
 });
 
+const billingOperation = v.union(
+  v.literal("chat"),
+  v.literal("title"),
+  v.literal("pdf"),
+  v.literal("browser_use"),
+  v.literal("custom_tool"),
+);
+
+const reservationStatus = v.union(
+  v.literal("active"),
+  v.literal("settled"),
+  v.literal("released"),
+  v.literal("expired"),
+  v.literal("cancelled"),
+);
+
 export default defineSchema({
   ...authTables,
   wallets: defineTable({
@@ -44,12 +63,19 @@ export default defineSchema({
     plan: v.union(v.literal("basic"), v.literal("pro")),
     balance: v.number(),
     reserved: v.number(),
+    balanceKobo: v.optional(v.number()),
+    reservedKobo: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
   walletTransactions: defineTable({
     userId: v.id("users"),
-    kind: v.union(v.literal("topup"), v.literal("upload")),
+    kind: v.union(
+      v.literal("topup"),
+      v.literal("upload"),
+      v.literal("usage"),
+      v.literal("adjustment"),
+    ),
     amount: v.number(),
     reference: v.string(),
     description: v.string(),
@@ -62,6 +88,7 @@ export default defineSchema({
     userId: v.id("users"),
     reference: v.string(),
     amount: v.number(),
+    plan: v.optional(v.union(v.literal("basic"), v.literal("pro"))),
     status: v.union(v.literal("pending"), v.literal("paid"), v.literal("failed")),
     createdAt: v.number(),
     paymentMethod: v.optional(v.string()),
@@ -73,6 +100,153 @@ export default defineSchema({
   })
     .index("by_reference", ["reference"])
     .index("by_user_created", ["userId", "createdAt"]),
+
+  paymentReports: defineTable({
+    userId: v.id("users"),
+    intentId: v.id("topupIntents"),
+    reference: v.string(),
+    amount: v.number(),
+    plan: v.union(v.literal("basic"), v.literal("pro")),
+    paymentStatus: v.union(v.literal("paid"), v.literal("failed")),
+    status: v.union(v.literal("open"), v.literal("resolved")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_intent", ["intentId"])
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_status_created", ["status", "createdAt"]),
+
+  fxRates: defineTable({
+    source: v.union(
+      v.literal("seed"),
+      v.literal("frankfurter"),
+      v.literal("exchangerate_api"),
+    ),
+    usdToNgn: v.number(),
+    sourceDate: v.optional(v.string()),
+    sourceUpdatedAt: v.optional(v.number()),
+    fetchedAt: v.number(),
+    active: v.boolean(),
+    rawPayload: v.optional(v.any()),
+  })
+    .index("by_active", ["active"])
+    .index("by_fetched", ["fetchedAt"]),
+
+  billingConfigVersions: defineTable({
+    key: v.literal("default"),
+    version: v.number(),
+    active: v.boolean(),
+    markupPct: v.number(),
+    holdSafetyFactor: v.number(),
+    browserUseMaxCostUsd: v.number(),
+    chatTurnCapKobo: v.number(),
+    titleCapKobo: v.number(),
+    customToolCapKobo: v.number(),
+    pdfCapKobo: v.number(),
+    activeFxRateId: v.optional(v.id("fxRates")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_key_active", ["key", "active"])
+    .index("by_version", ["version"]),
+
+  creditLedger: defineTable({
+    userId: v.id("users"),
+    kind: v.union(
+      v.literal("topup"),
+      v.literal("reservation"),
+      v.literal("release"),
+      v.literal("charge"),
+      v.literal("adjustment"),
+    ),
+    amountKobo: v.number(),
+    balanceAfterKobo: v.number(),
+    reservedAfterKobo: v.number(),
+    reference: v.string(),
+    description: v.string(),
+    reservationId: v.optional(v.id("usageReservations")),
+    usageEventId: v.optional(v.id("usageEvents")),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_reference", ["reference"])
+    .index("by_reservation", ["reservationId"])
+    .index("by_usage_event", ["usageEventId"]),
+
+  usageReservations: defineTable({
+    userId: v.id("users"),
+    key: v.string(),
+    operation: billingOperation,
+    scopeKey: v.optional(v.string()),
+    amountKobo: v.number(),
+    usdToNgn: v.number(),
+    markupPct: v.number(),
+    fxRateId: v.id("fxRates"),
+    status: reservationStatus,
+    metadata: v.optional(v.any()),
+    providerRef: v.optional(v.string()),
+    usageEventId: v.optional(v.id("usageEvents")),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_key", ["key"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_scope_status", ["scopeKey", "status"])
+    .index("by_expires", ["status", "expiresAt"]),
+
+  usageEvents: defineTable({
+    userId: v.id("users"),
+    reservationId: v.id("usageReservations"),
+    operation: billingOperation,
+    providerCostUsd: v.number(),
+    usdToNgn: v.number(),
+    markupPct: v.number(),
+    actualKobo: v.number(),
+    chargeKobo: v.number(),
+    underRecoveryKobo: v.number(),
+    providerRef: v.optional(v.string()),
+    usage: v.optional(v.any()),
+    idempotencyKey: v.string(),
+    fxRateId: v.id("fxRates"),
+    createdAt: v.number(),
+  })
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_reservation", ["reservationId"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  settlementOutbox: defineTable({
+    reservationId: v.id("usageReservations"),
+    userId: v.id("users"),
+    providerCostUsd: v.number(),
+    providerRef: v.optional(v.string()),
+    usage: v.optional(v.any()),
+    idempotencyKey: v.string(),
+    status: v.union(v.literal("pending"), v.literal("done"), v.literal("failed")),
+    attempts: v.number(),
+    nextAttemptAt: v.number(),
+    lastError: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status_next", ["status", "nextAttemptAt"])
+    .index("by_reservation", ["reservationId"])
+    .index("by_idempotency", ["idempotencyKey"]),
+
+  workCancellationRequests: defineTable({
+    userId: v.id("users"),
+    scopeKey: v.optional(v.string()),
+    provider: v.optional(v.string()),
+    providerRef: v.optional(v.string()),
+    reason: v.string(),
+    status: v.union(v.literal("pending"), v.literal("done"), v.literal("failed")),
+    lastError: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_status", ["userId", "status"])
+    .index("by_scope", ["scopeKey", "status"]),
 
   documents: defineTable({
     name: v.string(),
@@ -117,10 +291,6 @@ export default defineSchema({
     threadId: v.optional(v.string()),
     goal: v.string(),
     status: submissionStatus,
-    chargeAmount: v.optional(v.number()),
-    chargeStatus: v.optional(
-      v.union(v.literal("reserved"), v.literal("charged"), v.literal("released")),
-    ),
     edits: v.optional(
       v.array(
         v.object({

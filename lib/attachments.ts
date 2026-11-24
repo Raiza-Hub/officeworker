@@ -462,3 +462,20 @@ export async function uploadMultipartResumable(args: {
   await Promise.all(Array.from({ length: Math.min(concurrency, queue.length || 1) }, () => worker()));
   onProgress(100);
 }
+
+export function isSpreadsheetAttachment({
+  name,
+  mediaType,
+}: {
+  name: string;
+  mediaType: string;
+}): boolean {
+  const type = mediaType.toLowerCase();
+  return (
+    type.includes("sheet") ||
+    type.includes("csv") ||
+    type.includes("excel") ||
+    type.includes("tab-separated") ||
+    /\.(xlsx|xls|csv|tsv)$/i.test(name)
+  );
+}

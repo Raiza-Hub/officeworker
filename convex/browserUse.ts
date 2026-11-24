@@ -157,6 +157,11 @@ export async function getRun(runId: string) {
   return normalizeRun(await client.runs.get(runId));
 }
 
+export async function cancelRun(runId: string) {
+  const client = getClient();
+  return await client.runs.cancel(runId);
+}
+
 export async function getRunEvents(runId: string, after?: number | null) {
   const client = getClient();
   return await client.runs.events(runId, { after: after ?? undefined, limit: 200 });

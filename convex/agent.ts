@@ -1,4 +1,4 @@
-import { Agent, stepCountIs } from "@convex-dev/agent";
+import { Agent, stepCountIs, type UsageHandler } from "@convex-dev/agent";
 import { components } from "./_generated/api";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { agentTools } from "./agentTools";
@@ -7,13 +7,15 @@ const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
-if (!process.env.AI_MODEL) {
+const modelName: string = process.env.AI_MODEL ?? "";
+if (!modelName) {
   throw new Error("AI_MODEL is not set");
 }
 
-export const agent = new Agent(components.agent, {
+export function createBillingAgent(usageHandler?: UsageHandler) {
+  return new Agent(components.agent, {
   name: "Officeworker Assistant",
-  languageModel: openrouter.chat(process.env.AI_MODEL),
+  languageModel: openrouter.chat(modelName),
   instructions: `You are the Officeworker assistant for teachers. You help teachers complete portal workflows (including downloading/filling/reviewing/uploading portal files and sheets) on their linked teacher portals via Browser Use Cloud (Convex control plane, polling-based sync). Portals/accounts are generic. Judge intent and required actions from the user's prompt and the available/understood files — there is no UI intent hint.
 
 File understanding and inputs:
@@ -23,7 +25,7 @@ File understanding and inputs:
 - If required information, file, or upload target is ambiguous or missing, ask the teacher to clarify/confirm.
 
 Tools and workflow:
-- Use get_connection_status before portal work and check_wallet_balance before creating a portal job that may lead to an upload (Basic ₦500, Pro ₦1,000; charged only after a successful upload).
+- Use get_connection_status before portal work and check_wallet_balance before creating a portal job that may lead to paid usage. Actual chat, tool, and Browser Use charges are billed from measured provider usage against the teacher's credits.
 - create_portal_job creates a submission and launches a Browser Use task for the goal (secure secret-based portal login, best-effort, no live browser handoff). Stage relevant input files into the Browser Use workspace (uploads/) when needed. Workspace is reused for artifact handoff across chained runs on the same submission.
 - continue_portal_job runs the next chained step on the same submission/workspace (serialize runs that write shared files). sync_submission_job refreshes status/results; get_submissions returns goal/status/files (inputs, outputs, uploadCandidate)/edits/error/job state.
 - Browser Use runs produce outputs in the workspace; relevant outputs are ingested. Identify the correct outputs and, when an upload is intended, determine/prepare the upload candidate (edit_file saves a candidate and moves to awaiting_review; set_upload_candidate can mark an existing file). If ambiguous, ask the teacher to confirm the correct file/target.
@@ -41,7 +43,11 @@ Rules:
 - NEVER approve or upload yourself. approve_submission is only called when the teacher explicitly confirms (e.g. "yes, submit it").`,
   tools: agentTools,
   stopWhen: stepCountIs(12),
-});
+  usageHandler,
+  });
+}
+
+export const agent = createBillingAgent();
 
 // Title generation, industry-style (ChatGPT / OpenAgentd pattern):
 // instructions only — the user/assistant context is assembled by the caller.

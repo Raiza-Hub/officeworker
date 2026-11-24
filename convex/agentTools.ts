@@ -1,19 +1,8 @@
 import { createTool } from "@convex-dev/agent";
-import { ConvexError } from "convex/values";
 import { z } from "zod/v3";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-
-function billingErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ConvexError) {
-    const data = error.data as { message?: string } | string | undefined;
-    if (typeof data === "object" && typeof data?.message === "string") {
-      return data.message;
-    }
-    if (typeof data === "string") return data;
-  }
-  return error instanceof Error ? error.message : fallback;
-}
+import { BILLING_CONFIG, holdForUsdCost, koboToNaira } from "../lib/billing";
 
 export const getConnectionStatusTool = createTool({
   description:
@@ -41,21 +30,28 @@ export const getConnectionStatusTool = createTool({
 
 export const checkWalletBalanceTool = createTool({
   description:
-    "Check the teacher's available wallet balance against the price for one successful portal upload. " +
-    "Basic costs ₦500; Pro costs ₦1,000. Use this before creating a portal job that may lead to an upload.",
+    "Check the teacher's available wallet balance and the current estimated reserve for a portal task. " +
+    "Use this before creating a portal job that may lead to an upload.",
   inputSchema: z.object({}),
   execute: async (ctx): Promise<string> => {
     if (!ctx.userId) return "Not authenticated. Ask the teacher to sign in.";
+    const fx = await ctx.runQuery(internal.credits.getActiveFx, {});
+    if (!fx) return "Billing rates are not ready. Try again in a moment.";
+    const requiredAmount = holdForUsdCost(
+      BILLING_CONFIG.browserUseMaxCostUsd,
+      fx,
+    );
     const balance = await ctx.runQuery(internal.billing.checkBalanceByUserId, {
       userId: ctx.userId as Id<"users">,
+      requiredAmount,
     });
     if (!balance.sufficient) {
-      if (balance.available <= 0) {
+      if (balance.availableKobo <= 0) {
         return "You’ve run out of credits. Add credits to continue this chat.";
       }
       return "You don’t have enough credits to complete this request. Add more credits to continue.";
     }
-    return `Wallet check passed: ₦${balance.available.toLocaleString()} available; a successful ${balance.plan} upload costs ₦${balance.requiredAmount.toLocaleString()}.`;
+    return `Wallet check passed: ₦${koboToNaira(balance.availableKobo).toLocaleString()} available; the current estimated reserve is ₦${koboToNaira(balance.requiredAmount).toLocaleString()}.`;
   },
 });
 
@@ -179,7 +175,6 @@ export const getSubmissionsTool = createTool({
               }
             : null,
           error: submission.error ?? null,
-          chargeStatus: submission.chargeStatus ?? null,
         },
         null,
         2,
@@ -295,7 +290,7 @@ export const approveSubmissionTool = createTool({
   description:
     "Approve a submission's prepared upload candidate for portal upload. ONLY call this when the teacher has explicitly confirmed " +
     'they want to submit (e.g. "yes, submit it", "approve upload"). Never call this on your own. ' +
-    "Reserves funds on approval; if upload staging/start fails, funds are released and the submission returns to awaiting_review.",
+    "Usage credits are reserved when the portal run starts and charged from measured provider usage.",
   inputSchema: z.object({
     submissionId: z.string().describe("ID of the submission to approve"),
   }),
@@ -313,32 +308,14 @@ export const approveSubmissionTool = createTool({
       return "Cannot approve: no upload candidate is set for this submission yet.";
     }
     try {
-      await ctx.runMutation(internal.submissions.reserveSubmissionCharge, {
-        submissionId: input.submissionId as Id<"submissions">,
-        userId: ctx.userId as Id<"users">,
-      });
-    } catch (error) {
-      return billingErrorMessage(error, "Unable to reserve wallet funds for this upload.");
-    }
-
-    try {
       await ctx.runAction(internal.browserUseJobs.startUploadJob, {
         submissionId: input.submissionId as Id<"submissions">,
       });
     } catch (error) {
-      try {
-        await ctx.runMutation(internal.submissions.releaseSubmissionCharge, {
-          submissionId: input.submissionId as Id<"submissions">,
-          userId: ctx.userId as Id<"users">,
-          reason: "upload_start_failed",
-        });
-      } catch {
-        // best effort release; surface original error below
-      }
       const message = error instanceof Error ? error.message : "Upload could not be started";
-      return `Approval recorded but upload could not be started: ${message}. Reserved funds were released; the submission remains awaiting review so you can retry or adjust.`;
+      return `Approval recorded but upload could not be started: ${message}. The submission remains awaiting review so you can retry or adjust.`;
     }
-    return "Approval received and funds reserved. I’ve started the portal upload for this submission and will track its progress.";
+    return "Approval received. I’ve started the portal upload for this submission and will track its progress.";
   },
 });
 

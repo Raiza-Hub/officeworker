@@ -1,5 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
@@ -35,6 +35,9 @@ const browserJobValidator = v.object({
   lastError: v.optional(v.string()),
   resultSummary: v.optional(v.string()),
   syncDisabled: v.optional(v.boolean()),
+  reservationId: v.optional(v.id("usageReservations")),
+  providerCostUsd: v.optional(v.number()),
+  billingSettled: v.optional(v.boolean()),
 });
 
 const browserJobPatchValidator = v.object({
@@ -52,6 +55,9 @@ const browserJobPatchValidator = v.object({
   lastError: v.optional(v.string()),
   resultSummary: v.optional(v.string()),
   syncDisabled: v.optional(v.boolean()),
+  reservationId: v.optional(v.id("usageReservations")),
+  providerCostUsd: v.optional(v.number()),
+  billingSettled: v.optional(v.boolean()),
 });
 
 const artifactFileValidator = v.object({
@@ -79,12 +85,6 @@ async function listOwnedSubmissions(ctx: QueryCtx, userId: Id<"users">) {
     .take(50);
 }
 
-function walletUploadDescription(submission: { goal: string }) {
-  const goal = submission.goal.trim().replace(/\s+/g, " ");
-  const short = goal.length > 80 ? `${goal.slice(0, 77)}...` : goal || "Portal upload";
-  return `${short} successful upload`;
-}
-
 export const createSubmissionDraft = internalMutation({
   args: {
     userId: v.id("users"),
@@ -96,18 +96,12 @@ export const createSubmissionDraft = internalMutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const wallet = await ctx.db
-      .query("wallets")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first();
-    const chargeAmount = wallet?.plan === "pro" ? 1000 : 500;
     const id = await ctx.db.insert("submissions", {
       userId: args.userId,
       adapterId: args.adapterId,
       portalUrl: args.portalUrl,
       threadId: args.threadId,
       goal: args.goal.trim(),
-      chargeAmount,
       status: "preparing",
       browserJob: undefined,
       files: { inputs: args.inputs ?? [], outputs: [] },
@@ -145,54 +139,7 @@ export const updateSubmission = internalMutation({
     if (args.expectStatus !== undefined && submission.status !== args.expectStatus) {
       return { applied: false as const };
     }
-    if (submission.chargeStatus === "charged") {
-      return { applied: false as const };
-    }
-
     const patch: Record<string, unknown> = { updatedAt: Date.now() };
-    const chargeAmount = submission.chargeAmount ?? 500;
-    if (args.status === "done" && submission.chargeStatus !== "reserved") {
-      throw new Error("Upload cannot be completed without reserved wallet funds");
-    }
-
-    if (args.status === "done" && submission.chargeStatus === "reserved") {
-      const wallet = await ctx.db
-        .query("wallets")
-        .withIndex("by_user", (q) => q.eq("userId", submission.userId))
-        .first();
-      if (!wallet || wallet.reserved < chargeAmount || wallet.balance < chargeAmount) {
-        throw new Error("Reserved wallet funds are missing");
-      }
-      await ctx.db.patch(wallet._id, {
-        balance: wallet.balance - chargeAmount,
-        reserved: wallet.reserved - chargeAmount,
-        updatedAt: Date.now(),
-      });
-      await ctx.db.insert("walletTransactions", {
-        userId: submission.userId,
-        kind: "upload",
-        amount: -chargeAmount,
-        reference: `submission:${args.submissionId}`,
-        description: walletUploadDescription(submission),
-        createdAt: Date.now(),
-      });
-      patch.chargeStatus = "charged";
-    } else if (
-      (args.status === "failed" || args.status === "login_failed" || args.status === "cancelled") &&
-      submission.chargeStatus === "reserved"
-    ) {
-      const wallet = await ctx.db
-        .query("wallets")
-        .withIndex("by_user", (q) => q.eq("userId", submission.userId))
-        .first();
-      if (wallet) {
-        await ctx.db.patch(wallet._id, {
-          reserved: Math.max(0, wallet.reserved - chargeAmount),
-          updatedAt: Date.now(),
-        });
-      }
-      patch.chargeStatus = "released";
-    }
 
     if (args.status !== undefined) patch.status = args.status;
     if (args.error !== undefined) {
@@ -238,39 +185,17 @@ export const updateSubmission = internalMutation({
 });
 
 export const releaseSubmissionCharge = internalMutation({
-  args: { submissionId: v.id("submissions"), userId: v.id("users"), reason: v.optional(v.string()) },
+  args: {
+    submissionId: v.id("submissions"),
+    userId: v.id("users"),
+    reason: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const submission = await ctx.db.get(args.submissionId);
     if (!submission || submission.userId !== args.userId) {
       throw new Error("Submission not found");
     }
-    if (submission.chargeStatus !== "reserved") return { released: false as const };
-    const chargeAmount = submission.chargeAmount ?? 500;
-    const wallet = await ctx.db
-      .query("wallets")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first();
-    if (wallet) {
-      await ctx.db.patch(wallet._id, {
-        reserved: Math.max(0, wallet.reserved - chargeAmount),
-        updatedAt: Date.now(),
-      });
-    }
-    await ctx.db.patch(submission._id, {
-      chargeStatus: "released",
-      status:
-        submission.status === "submitting" || submission.status === "preparing"
-          ? "awaiting_review"
-          : submission.status,
-      updatedAt: Date.now(),
-    });
-    await ctx.db.insert("auditLog", {
-      submissionId: submission._id,
-      event: "charge_released",
-      detail: { reason: args.reason ?? "released" },
-      at: Date.now(),
-    });
-    return { released: true as const };
+    return { released: false as const };
   },
 });
 
@@ -281,53 +206,7 @@ export const reserveSubmissionCharge = internalMutation({
     if (!submission || submission.userId !== args.userId) {
       throw new Error("Submission not found");
     }
-    if (submission.status !== "awaiting_review") {
-      throw new Error(`Cannot reserve funds while submission is ${submission.status}`);
-    }
-    if (!submission.files.uploadCandidate) {
-      throw new Error("No upload candidate is ready for this submission");
-    }
-    if (submission.chargeStatus === "reserved") {
-      return { amount: submission.chargeAmount ?? 500 };
-    }
-    if (submission.chargeStatus === "charged") {
-      throw new Error("This submission has already been charged");
-    }
-    const wallet = await ctx.db
-      .query("wallets")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first();
-    const plan = wallet?.plan ?? "basic";
-    const chargeAmount = submission.chargeAmount ?? (plan === "pro" ? 1000 : 500);
-    const available = Math.max(0, (wallet?.balance ?? 0) - (wallet?.reserved ?? 0));
-    if (!wallet || available <= 0) {
-      throw new ConvexError({
-        code: "WALLET_EMPTY",
-        context: "continue",
-        message: "You’ve run out of credits. Add credits to continue this chat.",
-      });
-    }
-    if (available < chargeAmount) {
-      throw new ConvexError({
-        code: "INSUFFICIENT_CREDITS",
-        message:
-          "You don’t have enough credits to complete this request. Add more credits to continue.",
-        required: chargeAmount,
-        available,
-        plan,
-      });
-    }
-    await ctx.db.patch(wallet._id, {
-      reserved: wallet.reserved + chargeAmount,
-      updatedAt: Date.now(),
-    });
-    await ctx.db.patch(submission._id, {
-      chargeAmount,
-      chargeStatus: "reserved",
-      status: "submitting",
-      updatedAt: Date.now(),
-    });
-    return { amount: chargeAmount };
+    return { amount: 0 };
   },
 });
 
