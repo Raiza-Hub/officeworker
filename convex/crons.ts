@@ -10,4 +10,25 @@ crons.daily(
   {},
 );
 
+crons.daily(
+  "refresh USD NGN rate",
+  { hourUTC: 0, minuteUTC: 10 },
+  internal.fx.refreshFxRate,
+  {},
+);
+
+crons.interval(
+  "expire stale credit holds",
+  { minutes: 10 },
+  internal.credits.expireStaleReservations,
+  {},
+);
+
+crons.interval(
+  "process billing settlement outbox",
+  { minutes: 1 },
+  internal.credits.processSettlementOutbox,
+  {},
+);
+
 export default crons;

@@ -7,7 +7,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "convex": "convex dev"
+    "test": "bun test",
+    "test:convex": "vitest run --config vitest.config.mts",
+    "convex": "convex dev",
+    "seed:billing": "bun scripts/seed-billing-history.ts",
+    "seed:billing:clear": "bun scripts/seed-billing-history.ts --clear",
+    "seed:invoices": "bun scripts/seed-invoices.ts",
+    "seed:invoices:clear": "bun scripts/seed-invoices.ts --clear",
+    "seed:reports": "bun scripts/seed-reports.ts",
+    "seed:reports:clear": "bun scripts/seed-reports.ts --clear"
   },
   "dependencies": {
     "@auth/core": "0.41.3",
@@ -49,6 +57,7 @@
     "cn": "^0.5.2",
     "convex": "^1.48.0",
     "convex-helpers": "^0.1.134",
+    "echarts": "^6.1.0",
     "exceljs": "^4.4.0",
     "fuse.js": "^7.5.0",
     "lucide-react": "^1.65.0",
@@ -65,15 +74,18 @@
     "zustand": "^5.1.0"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "convex-test": "^0.0.73",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.1.1"
   },
   "packageManager": "bun@1.4.0",
   "ignoreScripts": [

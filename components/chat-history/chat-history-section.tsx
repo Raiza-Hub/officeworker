@@ -10,12 +10,12 @@ export function ChatHistorySection() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <div className="mt-1">
+    <div className="mt-1 flex min-h-0 flex-1 flex-col">
       <button
         type="button"
         aria-expanded={isExpanded}
         onClick={() => setIsExpanded((v) => !v)}
-        className="flex h-7 w-full items-center gap-1 rounded-lg px-[5px] text-left text-xs leading-3.5 font-medium text-[#62656d] transition-colors duration-100 ease-out hover:bg-secondary hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring/40 motion-reduce:transition-none"
+        className="flex h-7 w-full shrink-0 items-center gap-1 rounded-lg px-[5px] text-left text-xs leading-3.5 font-medium text-[#62656d] transition-colors duration-100 ease-out hover:bg-secondary hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring/40 motion-reduce:transition-none"
       >
         <span className="flex-1">Chat history</span>
         <ChevronDown
@@ -51,7 +51,7 @@ export function ChatHistorySection() {
                     ease: "easeOut",
                   }
             }
-            className="pt-[3px] pb-1"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-none pt-[3px] pb-1"
           >
             <ChatHistoryList />
           </m.div>

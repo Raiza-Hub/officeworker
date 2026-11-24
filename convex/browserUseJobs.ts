@@ -6,6 +6,7 @@ import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
+import { BILLING_CONFIG, holdForUsdCost } from "../lib/billing";
 import { createR2Client, getR2Config } from "./r2";
 import {
   createProfile,
@@ -14,6 +15,7 @@ import {
   createWorkspaceUploadUrls,
   downloadWorkspaceFilesTolerant,
   drainRunEvents,
+  cancelRun,
   getBrowserUseConfiguredModel,
   getRun,
   getRunStatus,
@@ -297,14 +299,49 @@ async function startRunForSubmission(
   const task = buildPortalTask(submission, submission.portalUrl, intent, extraInstruction);
   const secretBindings = await getPortalSecretBindings(ctx, submission.userId, submission.portalUrl);
   const configuredModel = getBrowserUseConfiguredModel();
-  const { id: runId, sessionId, workspaceId: resolvedWs } = await createRun({
-    task,
-    workspaceId,
-    profileId,
-    keepAlive: RUN_KEEP_ALIVE_SECONDS,
-    secretBindings,
-    ...(configuredModel ? { model: configuredModel } : {}),
+  const fx = await ctx.runQuery(internal.credits.getActiveFx);
+  if (!fx) throw new Error("Billing FX rate is unavailable");
+  const holdKobo = holdForUsdCost(BILLING_CONFIG.browserUseMaxCostUsd, {
+    usdToNgn: fx.usdToNgn,
+    markupPct: fx.markupPct,
   });
+  const attempt = (submission.browserJob?.attempts ?? 0) + 1;
+  const reservationId = await ctx.runMutation(internal.credits.reserveCredits, {
+    userId: submission.userId,
+    key: `browser:${submissionId}:${intent}:${attempt}`,
+    operation: "browser_use",
+    amountKobo: holdKobo,
+    scopeKey: `submission:${submissionId}`,
+    metadata: { submissionId, intent, maxCostUsd: BILLING_CONFIG.browserUseMaxCostUsd },
+  });
+
+  let runId: string;
+  let sessionId: string | undefined;
+  let resolvedWs: string | undefined;
+  try {
+    const run = await createRun({
+      task,
+      workspaceId,
+      profileId,
+      keepAlive: RUN_KEEP_ALIVE_SECONDS,
+      secretBindings,
+      maxCostUsd: BILLING_CONFIG.browserUseMaxCostUsd,
+      ...(configuredModel ? { model: configuredModel } : {}),
+    });
+    runId = run.id;
+    sessionId = run.sessionId;
+    resolvedWs = run.workspaceId;
+    await ctx.runMutation(internal.credits.recordReservationProviderRef, {
+      reservationId,
+      providerRef: runId,
+    });
+  } catch (error) {
+    await ctx.runMutation(internal.credits.releaseReservation, {
+      reservationId,
+      reason: "browser_run_start_failed",
+    });
+    throw error;
+  }
 
   await ctx.runMutation(internal.submissions.updateSubmission, {
     submissionId,
@@ -320,8 +357,9 @@ async function startRunForSubmission(
       workspaceId: resolvedWs ?? workspaceId,
       profileId,
       lastSyncedAt: now(),
-      attempts: (submission.browserJob?.attempts ?? 0) + 1,
+      attempts: attempt,
       keepAliveUntil: now() + RUN_KEEP_ALIVE_SECONDS * 1000,
+      reservationId,
     },
     auditEvent: intent === "upload" ? "browser_use_upload_started" : "browser_use_task_started",
     auditDetail: {
@@ -525,6 +563,11 @@ export const pollSubmissionJob = internalAction({
     const job = submission.browserJob;
     if (!job?.runId) return { ok: false, reason: "no_job" };
     if (job.syncDisabled) return { ok: false, reason: "sync_disabled" };
+    if (job.reservationId) {
+      await ctx.runMutation(internal.credits.heartbeatReservation, {
+        reservationId: job.reservationId,
+      });
+    }
     if (["done", "cancelled"].includes(submission.status) && isTerminalRunStatus(job.status)) {
       return { ok: true, terminal: true };
     }
@@ -564,6 +607,43 @@ export const pollSubmissionJob = internalAction({
 
       const run = await getRun(job.runId);
       const runStatus = String((run as any)?.status ?? status ?? "").toLowerCase();
+      const rawProviderCost = Number((run as any)?.totalCostUsd ?? 0);
+      const providerCostUsd =
+        Number.isFinite(rawProviderCost) && rawProviderCost >= 0
+          ? rawProviderCost
+          : 0;
+
+      if (job.reservationId) {
+        const idempotencyKey = `browser:${job.reservationId}`;
+        await ctx.runMutation(internal.credits.enqueueSettlement, {
+          reservationId: job.reservationId,
+          userId: submission.userId,
+          providerCostUsd,
+          providerRef: job.runId,
+          usage: {
+            totalInputTokens: (run as any)?.totalInputTokens ?? null,
+            totalOutputTokens: (run as any)?.totalOutputTokens ?? null,
+          },
+          idempotencyKey,
+        });
+        await ctx.runMutation(internal.credits.settleReservation, {
+          reservationId: job.reservationId,
+          providerCostUsd,
+          providerRef: job.runId,
+          usage: { totalCostUsd: providerCostUsd },
+          idempotencyKey,
+        });
+        await ctx.runMutation(internal.submissions.updateSubmission, {
+          submissionId: submission._id,
+          browserJobPatch: {
+            intent: job.intent,
+            providerCostUsd,
+            billingSettled: true,
+          },
+          auditEvent: "browser_use_usage_settled",
+          auditDetail: { providerCostUsd, runId: job.runId },
+        });
+      }
 
       if (isSuccessRunStatus(runStatus)) {
         try {
@@ -629,7 +709,7 @@ export const resumeOrRetrySubmission = internalAction({
 
     if (submission.status === "failed" || submission.status === "login_failed" || submission.status === "cancelled") {
       // If an upload failed after a candidate was prepared, return to review so teacher can explicitly approve again.
-      if (submission.files.uploadCandidate && (job?.intent === "upload" || submission.chargeStatus === "reserved")) {
+      if (submission.files.uploadCandidate && job?.intent === "upload") {
         await ctx.runMutation(internal.submissions.updateSubmission, {
           submissionId: args.submissionId,
           status: "awaiting_review",
@@ -671,13 +751,49 @@ export const resumeOrRetrySubmission = internalAction({
 export const cancelSubmissionJob = internalAction({
   args: { submissionId: v.id("submissions") },
   handler: async (ctx, args) => {
+    const submission: Doc<"submissions"> | null = await ctx.runQuery(
+      internal.submissions.getSubmissionInternal,
+      { submissionId: args.submissionId },
+    );
+    if (!submission) return { ok: false };
+    const runId = submission.browserJob?.runId;
+    const reservationId = submission.browserJob?.reservationId;
+    if (runId) {
+      await cancelRun(runId).catch((error) => {
+        console.error("browser run cancel failed", error);
+      });
+    }
+    if (reservationId) {
+      await ctx.runMutation(internal.credits.releaseReservation, {
+        reservationId,
+        reason: "browser_cancelled",
+      });
+    }
     await ctx.runMutation(internal.submissions.updateSubmission, {
       submissionId: args.submissionId,
       status: "cancelled",
-      browserJobPatch: { intent: "cancelled", syncDisabled: true, lastSyncedAt: now() },
+      browserJobPatch: {
+        intent: "cancelled",
+        syncDisabled: true,
+        lastSyncedAt: now(),
+        billingSettled: Boolean(reservationId),
+      },
       auditEvent: "cancelled",
     });
     return { ok: true };
+  },
+});
+
+export const cancelRunForBilling = internalAction({
+  args: { runId: v.string() },
+  handler: async (_ctx, args) => {
+    try {
+      await cancelRun(args.runId);
+      return { ok: true };
+    } catch (error) {
+      console.error("browser run billing cancel failed", error);
+      return { ok: false };
+    }
   },
 });
 

@@ -3,7 +3,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { z } from "zod";
 
-const requestSchema = z.object({ amount: z.number().int().min(500).max(1_000_000) });
+const requestSchema = z.object({ amount: z.number().int().min(3000).max(1_000_000) });
 
 export async function POST(request: Request) {
   const token = await convexAuthNextjsToken();
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   try {
     amount = requestSchema.parse(await request.json()).amount;
   } catch {
-    return Response.json({ error: "Choose an amount from ₦500 to ₦1,000,000." }, { status: 400 });
+    return Response.json({ error: "Choose an amount from ₦3,000 to ₦1,000,000." }, { status: 400 });
   }
 
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
         narration: "Officeworker wallet top-up",
         customer: { name: intent.name, email: intent.email },
         redirect_url: `${siteUrl.replace(/\/$/, "")}/billing?payment=return`,
-        notification_url: `${convexSiteUrl.replace(/\/$/, "")}/korapay-webhook`,
+        notification_url: `${convexSiteUrl.replace(/\/$/, "")}/billing/korapay-webhook`,
       }),
     });
     const result = (await response.json()) as {

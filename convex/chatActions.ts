@@ -2,6 +2,7 @@
 
 import { generateText, type ModelMessage } from "ai";
 import type { ActionCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -16,9 +17,14 @@ import {
   updateThreadMetadata,
   saveMessage,
 } from "@convex-dev/agent";
-import { agent, TITLE_INSTRUCTIONS, cleanTitle } from "./agent";
+import { createBillingAgent, TITLE_INSTRUCTIONS, cleanTitle } from "./agent";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createR2Client, getR2Config } from "./r2";
+import { isSpreadsheetAttachment } from "../lib/attachments";
+import {
+  estimateOpenRouterCostUsd,
+  openRouterCostUsd,
+} from "../lib/billing";
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -37,6 +43,16 @@ const MODEL_FILE_URL_TTL_SECONDS = 15 * 60;
 function isPdfAttachment(attachment: Attachment): boolean {
   return (
     attachment.mediaType === "application/pdf" || /\.pdf$/i.test(attachment.name)
+  );
+}
+
+function openRouterChargeUsd(usage: unknown, providerMetadata: unknown): number {
+  if ((process.env.AI_MODEL ?? "").toLowerCase() === "openrouter/free") {
+    return 0;
+  }
+  return (
+    openRouterCostUsd(usage, providerMetadata) ??
+    estimateOpenRouterCostUsd(usage)
   );
 }
 
@@ -129,12 +145,7 @@ async function buildAttachmentMessages(
 
   const results = await Promise.all(
     attachments.map(async (attachment) => {
-      const isSpreadsheet =
-        attachment.mediaType.includes("sheet") ||
-        attachment.mediaType.includes("csv") ||
-        /\.(xlsx|xls|csv)$/i.test(attachment.name);
-
-      if (isSpreadsheet) {
+      if (isSpreadsheetAttachment(attachment)) {
         const bytes = await fetchObjectBytes(attachment.key);
         const text = await spreadsheetToText(Buffer.from(bytes), attachment.name);
         return { kind: "text" as const, text };
@@ -218,11 +229,47 @@ export const generateReply = internalAction({
         size: v.number(),
       }),
     ),
+    userId: v.id("users"),
+    reservationId: v.id("usageReservations"),
+    reservationKey: v.string(),
+    holdKobo: v.number(),
+    customToolHolds: v.optional(
+      v.array(
+        v.object({
+          reservationId: v.id("usageReservations"),
+          attachmentKey: v.string(),
+        }),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
     let turnStatus: "completed" | "failed" | "cancelled" = "completed";
     let startedAt: number | null = null;
     const streamState = { finalizedByAgent: false };
+    let providerCostUsd = 0;
+    const customToolHolds = args.customToolHolds ?? [];
+    const releaseCustomToolHolds = async (reason: string) => {
+      if (customToolHolds.length === 0) return;
+      await ctx.runMutation(internal.credits.releaseReservations, {
+        reservationIds: customToolHolds.map((hold) => hold.reservationId),
+        reason,
+      });
+    };
+    const settleCustomToolHolds = async () => {
+      if (customToolHolds.length === 0) return;
+      await ctx.runMutation(internal.credits.settleCustomToolHolds, {
+        holds: customToolHolds.map((hold) => ({
+          reservationId: hold.reservationId,
+          providerRef: args.promptMessageId,
+          usage: {
+            promptMessageId: args.promptMessageId,
+            toolName: "spreadsheet_parse",
+            attachmentKey: hold.attachmentKey,
+          },
+          idempotencyKey: `custom_tool:${hold.reservationId}`,
+        })),
+      });
+    };
     try {
       if (
         await ctx.runQuery(internal.chat.isTurnCancelled, {
@@ -230,16 +277,27 @@ export const generateReply = internalAction({
         })
       ) {
         turnStatus = "cancelled";
+        await ctx.runMutation(internal.credits.releaseReservation, {
+          reservationId: args.reservationId,
+          reason: "cancelled_before_start",
+        });
+        await releaseCustomToolHolds("cancelled_before_start");
         return;
       }
       const attachmentMessages =
         args.attachments.length > 0
           ? await buildAttachmentMessages(args.attachments)
           : [];
+      await settleCustomToolHolds();
       const fileParserModel =
         args.attachments.some(isPdfAttachment) && process.env.AI_MODEL
           ? openrouter.chat(process.env.AI_MODEL, {
-              plugins: [{ id: "file-parser" }],
+              plugins: [
+                {
+                  id: "file-parser",
+                  pdf: { engine: "cloudflare-ai" },
+                },
+              ],
             })
           : undefined;
 
@@ -248,12 +306,27 @@ export const generateReply = internalAction({
         promptMessageId: args.promptMessageId,
       });
 
+      const billingAgent = createBillingAgent(
+        async (_ctx, { usage, providerMetadata }) => {
+          const stepCost = openRouterChargeUsd(usage, providerMetadata);
+          providerCostUsd += stepCost;
+          await ctx.runMutation(internal.credits.enqueueSettlement, {
+            reservationId: args.reservationId,
+            userId: args.userId,
+            providerCostUsd,
+            providerRef: args.promptMessageId,
+            usage,
+            idempotencyKey: `chat:${args.reservationKey}`,
+          });
+        },
+      );
+
       // Stream-phase errors are handled by the Agent itself: its internal
       // onError finalizes the pending assistant message as "failed" (or
       // materializes partial output) and marks the stream "aborted". Our
       // onError callback runs after that cleanup, so it tells us whether
       // the failure belongs to the stream phase.
-      const result = await agent.streamText(
+      const result = await billingAgent.streamText(
         ctx,
         { threadId: args.threadId },
         {
@@ -266,6 +339,13 @@ export const generateReply = internalAction({
         },
         { saveStreamDeltas: true },
       );
+      if (result.order !== undefined) {
+        await ctx.runMutation(internal.credits.recordReservationProviderRef, {
+          reservationId: args.reservationId,
+          providerRef: args.promptMessageId,
+          order: result.order,
+        });
+      }
       if (
         await ctx.runQuery(internal.chat.isTurnCancelled, {
           promptMessageId: args.promptMessageId,
@@ -326,6 +406,22 @@ export const generateReply = internalAction({
           status: turnStatus,
         });
       }
+      await releaseCustomToolHolds("generate_reply_finished");
+      await ctx.runMutation(internal.credits.enqueueSettlement, {
+        reservationId: args.reservationId,
+        userId: args.userId,
+        providerCostUsd,
+        providerRef: args.promptMessageId,
+        usage: { promptMessageId: args.promptMessageId, status: turnStatus },
+        idempotencyKey: `chat:${args.reservationKey}`,
+      });
+      await ctx.runMutation(internal.credits.settleReservation, {
+        reservationId: args.reservationId,
+        providerCostUsd,
+        providerRef: args.promptMessageId,
+        usage: { promptMessageId: args.promptMessageId, status: turnStatus },
+        idempotencyKey: `chat:${args.reservationKey}`,
+      });
     }
   },
 });
@@ -334,9 +430,10 @@ export const generateThreadTitle = internalAction({
   args: {
     threadId: v.string(),
     promptText: v.string(),
+    reservationId: v.optional(v.id("usageReservations")),
   },
   handler: async (ctx, args) => {
-    await maybeGenerateTitle(ctx, args.threadId, args.promptText);
+    await maybeGenerateTitle(ctx, args.threadId, args.promptText, args.reservationId);
   },
 });
 
@@ -347,12 +444,21 @@ async function maybeGenerateTitle(
   ctx: ActionCtx,
   threadId: string,
   promptText: string,
+  reservationId?: Id<"usageReservations">,
 ): Promise<void> {
   try {
     const metadata = await getThreadMetadata(ctx, components.agent, {
       threadId,
     });
-    if (metadata.title) return;
+    if (metadata.title) {
+      if (reservationId) {
+        await ctx.runMutation(internal.credits.releaseReservation, {
+          reservationId,
+          reason: "title_already_exists",
+        });
+      }
+      return;
+    }
 
     const fallback = promptText.slice(0, 50).trim() || "New chat";
 
@@ -361,52 +467,88 @@ async function maybeGenerateTitle(
     const wordCount = promptText.trim().split(/\s+/).filter(Boolean).length;
     if (wordCount < 3 || GREETING_ONLY.test(promptText.trim())) {
       await applyTitle(ctx, threadId, fallback);
+      if (reservationId) {
+        await ctx.runMutation(internal.credits.releaseReservation, {
+          reservationId,
+          reason: "title_skipped",
+        });
+      }
       return;
     }
 
     const contextText = `User: ${promptText.slice(0, 1000)}`;
 
     let title = fallback;
+    let costUsd = 0;
     try {
-      title = cleanTitle(await generateTitleText(contextText), fallback);
+      const generated = await generateTitleText(contextText);
+      title = cleanTitle(generated.text, fallback);
+      costUsd = generated.costUsd;
     } catch {
       // Keep the fallback title if both attempts fail.
     }
 
     await applyTitle(ctx, threadId, title);
+    if (reservationId) {
+      const reservation = await ctx.runQuery(internal.credits.getReservation, {
+        reservationId,
+      });
+      if (reservation) {
+        await ctx.runMutation(internal.credits.enqueueSettlement, {
+          reservationId,
+          userId: reservation.userId,
+          providerCostUsd: costUsd,
+          usage: { operation: "title" },
+          idempotencyKey: `title:${reservationId}`,
+        });
+        await ctx.runMutation(internal.credits.settleReservation, {
+          reservationId,
+          providerCostUsd: costUsd,
+          usage: { operation: "title" },
+          idempotencyKey: `title:${reservationId}`,
+        });
+      }
+    }
   } catch (error) {
     console.error("title generation failed", error);
+    if (reservationId) {
+      await ctx.runMutation(internal.credits.releaseReservation, {
+        reservationId,
+        reason: "title_failed",
+      }).catch(() => undefined);
+    }
   }
 }
 
-async function generateTitleText(contextText: string): Promise<string> {
+async function generateTitleText(
+  contextText: string,
+): Promise<{ text: string; costUsd: number }> {
   const modelName = process.env.AI_MODEL;
   if (!modelName) {
     throw new Error("AI_MODEL is not set");
   }
   const model = openrouter.chat(modelName);
-  try {
-    const { text } = await generateText({
+  const result = await generateText({
+    model,
+    instructions: TITLE_INSTRUCTIONS,
+    prompt: contextText.slice(0, 2000),
+    temperature: 0.2,
+    providerOptions: {
+      openrouter: { reasoning: { maxTokens: 0 } },
+    },
+  }).catch(async () =>
+    await generateText({
       model,
       instructions: TITLE_INSTRUCTIONS,
       prompt: contextText.slice(0, 2000),
       temperature: 0.2,
-      providerOptions: {
-        openrouter: { reasoning: { maxTokens: 0 } },
-      },
-    });
-    if (text) return text;
-    throw new Error("empty title output");
-  } catch {
-    // Some providers reject the reasoning override — retry without it.
-    const { text } = await generateText({
-      model,
-      instructions: TITLE_INSTRUCTIONS,
-      prompt: contextText.slice(0, 2000),
-      temperature: 0.2,
-    });
-    return text;
-  }
+    }),
+  );
+  if (!result.text) throw new Error("empty title output");
+  return {
+    text: result.text,
+    costUsd: openRouterChargeUsd(result.usage, result.providerMetadata),
+  };
 }
 
 // Non-destructive write: re-check the title right before applying so a

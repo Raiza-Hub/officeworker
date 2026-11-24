@@ -1,5 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -22,8 +22,26 @@ import {
   query,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
+import {
+  releaseReservationCore,
+  releaseReservationsCore,
+  reserveCreditsCore,
+  reserveCustomToolHoldsCore,
+} from "./credits";
+import { isSpreadsheetAttachment } from "../lib/attachments";
+import { BILLING_CONFIG } from "../lib/billing";
 
 const MAX_TITLE_PROMPT_CHARS = 2000;
+
+function hasPdfAttachment(
+  attachments: Array<{ key: string; name: string; mediaType: string; size: number }>,
+): boolean {
+  return attachments.some(
+    (attachment) =>
+      attachment.mediaType === "application/pdf" ||
+      /\.pdf$/i.test(attachment.name),
+  );
+}
 
 async function authorizeThreadAccess(
   ctx: MutationCtx | QueryCtx,
@@ -105,23 +123,110 @@ export const sendMessage = mutation({
       throw new Error("Message is empty");
     }
 
-    const wallet = await ctx.db
-      .query("wallets")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .first();
-    const available = Math.max(0, (wallet?.balance ?? 0) - (wallet?.reserved ?? 0));
-    if (available <= 0) {
-      throw new ConvexError({
-        code: "WALLET_EMPTY",
-        context: "continue",
-        message: "You’ve run out of credits. Add credits to continue this chat.",
-      });
+    const chatReservationKey = `chat:${crypto.randomUUID()}`;
+    const chatHoldKobo =
+      BILLING_CONFIG.chatTurnCapKobo +
+      (hasPdfAttachment(args.attachments ?? []) ? BILLING_CONFIG.pdfCapKobo : 0);
+    const chatReservationId = await reserveCreditsCore(ctx, {
+      userId,
+      key: chatReservationKey,
+      operation: "chat",
+      amountKobo: chatHoldKobo,
+      scopeKey: `thread:${args.threadId}`,
+      metadata: { threadId: args.threadId, prompt: prompt.slice(0, 200) },
+    });
+
+    let titleReservationId: Id<"usageReservations"> | undefined;
+    if (isFirstMessage) {
+      try {
+        titleReservationId = await reserveCreditsCore(ctx, {
+          userId,
+          key: `title:${chatReservationKey}`,
+          operation: "title",
+          amountKobo: BILLING_CONFIG.titleCapKobo,
+          scopeKey: `thread:${args.threadId}`,
+          metadata: { threadId: args.threadId },
+        });
+      } catch (error) {
+        await releaseReservationCore(ctx, chatReservationId, "title_reservation_failed");
+        throw error;
+      }
     }
 
     const { messageId } = await saveMessage(ctx, components.agent, {
       threadId: args.threadId,
       prompt,
     });
+    await ctx.db.patch(chatReservationId, { providerRef: messageId });
+    if (titleReservationId) {
+      await ctx.db.patch(titleReservationId, { providerRef: messageId });
+    }
+
+    let customToolHolds: Array<{
+      reservationId: Id<"usageReservations">;
+      attachmentKey: string;
+    }> = [];
+    try {
+      const seenAttachmentKeys = new Set<string>();
+      const spreadsheetHolds: Array<{
+        attachmentKey: string;
+        hold: {
+          key: string;
+          scopeKey: string;
+          metadata: {
+            threadId: string;
+            promptMessageId: string;
+            toolName: string;
+            attachmentKey: string;
+          };
+          providerRef: string;
+        };
+      }> = [];
+      for (const attachment of args.attachments ?? []) {
+        if (
+          !isSpreadsheetAttachment(attachment) ||
+          seenAttachmentKeys.has(attachment.key)
+        ) {
+          continue;
+        }
+        seenAttachmentKeys.add(attachment.key);
+        spreadsheetHolds.push({
+          attachmentKey: attachment.key,
+          hold: {
+            key: `custom_tool:spreadsheet:${messageId}:${attachment.key}`,
+            scopeKey: `thread:${args.threadId}`,
+            metadata: {
+              threadId: args.threadId,
+              promptMessageId: messageId,
+              toolName: "spreadsheet_parse",
+              attachmentKey: attachment.key,
+            },
+            providerRef: messageId,
+          },
+        });
+      }
+      const reservationIds = await reserveCustomToolHoldsCore(
+        ctx,
+        userId,
+        spreadsheetHolds.map((entry) => entry.hold),
+      );
+      customToolHolds = spreadsheetHolds.map((entry, index) => ({
+        reservationId: reservationIds[index]!,
+        attachmentKey: entry.attachmentKey,
+      }));
+    } catch (error) {
+      await releaseReservationsCore(
+        ctx,
+        [
+          chatReservationId,
+          ...(titleReservationId ? [titleReservationId] : []),
+          ...customToolHolds.map((hold) => hold.reservationId),
+        ],
+        "spreadsheet_reservation_failed",
+      );
+      throw error;
+    }
+
     await Promise.all(
       (args.attachments ?? []).map((attachment) =>
         ctx.db.insert("messageAttachments", {
@@ -144,13 +249,19 @@ export const sendMessage = mutation({
       await ctx.scheduler.runAfter(0, internal.chatActions.generateThreadTitle, {
         threadId: args.threadId,
         promptText: prompt.slice(0, MAX_TITLE_PROMPT_CHARS),
+        reservationId: titleReservationId,
       });
     }
 
     await ctx.scheduler.runAfter(0, internal.chatActions.generateReply, {
+      userId,
       threadId: args.threadId,
       promptMessageId: messageId,
       attachments: args.attachments ?? [],
+      reservationId: chatReservationId,
+      reservationKey: chatReservationKey,
+      holdKobo: chatHoldKobo,
+      customToolHolds,
     });
     return { messageId };
   },
@@ -189,6 +300,22 @@ export const cancelGeneration = mutation({
       order: args.order,
       reason: "User cancelled",
     });
+    const activeReservations = await ctx.db
+      .query("usageReservations")
+      .withIndex("by_scope_status", (q) =>
+        q.eq("scopeKey", `thread:${args.threadId}`).eq("status", "active"),
+      )
+      .collect();
+    const reservationIds = activeReservations
+      .filter(
+        (reservation) =>
+          reservation.providerRef === args.promptMessageId &&
+          ["chat", "title", "custom_tool"].includes(reservation.operation),
+      )
+      .map((reservation) => reservation._id);
+    if (reservationIds.length > 0) {
+      await releaseReservationsCore(ctx, reservationIds, "user_cancelled");
+    }
     return true;
   },
 });
