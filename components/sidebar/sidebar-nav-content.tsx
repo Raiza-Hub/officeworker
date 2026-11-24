@@ -193,7 +193,7 @@ export function SidebarNavContent() {
         )}
       </div>
 
-      <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-none px-3">
+      <div className="mt-3 flex min-h-0 flex-1 flex-col px-3">
         <ChatHistorySection />
       </div>
 

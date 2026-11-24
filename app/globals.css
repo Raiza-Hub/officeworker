@@ -77,6 +77,8 @@
   --color-primary-ring: #6069d9;
   --color-danger-text: #b42318;
   --color-danger-bg: #fdecec;
+  --color-success-text: #137333;
+  --color-success-bg: #e7f6ed;
 }
 
 body {

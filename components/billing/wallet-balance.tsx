@@ -17,8 +17,8 @@ export function WalletBalance() {
   async function startCheckout() {
     setError(null);
     const value = Number(amount);
-    if (!Number.isFinite(value) || value < 500 || value > 1_000_000) {
-      const message = "Enter an amount between ₦500 and ₦1,000,000.";
+    if (!Number.isFinite(value) || value < 3000 || value > 1_000_000) {
+      const message = "Enter an amount between ₦3,000 and ₦1,000,000.";
       setError(message);
       throw new Error(message);
     }
@@ -61,13 +61,13 @@ export function WalletBalance() {
           <h2 className="m-0 text-[15px] leading-[23px] font-medium text-ink-soft">
             Wallet balance
           </h2>
-          <div className="mt-1 min-h-5.5">
+          <div className="mt-1 min-h-8">
             {wallet ? (
-              <p className="m-0 text-[13px] leading-5.5 font-[450] text-text-tertiary">
-                {naira(wallet.available)}
+              <p className="m-0 text-[32px] leading-none font-medium tabular-nums tracking-tight text-ink">
+                {naira(wallet.balanceKobo / 100)}
               </p>
             ) : (
-              <div className="h-3.5 w-48 animate-pulse rounded bg-secondary" />
+              <div className="h-8 w-48 animate-pulse rounded bg-secondary" />
             )}
           </div>
         </div>
@@ -77,7 +77,7 @@ export function WalletBalance() {
             setIsAdding((open) => !open);
             setError(null);
           }}
-          className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs leading-none font-medium text-ink-soft transition-colors hover:bg-[#f2f2f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs leading-none font-medium text-ink-soft transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           {isAdding ? "Close" : "Add credits"}
         </button>
@@ -89,18 +89,18 @@ export function WalletBalance() {
             htmlFor="wallet-topup-amount"
             className="block text-xs font-medium text-text-secondary"
           >
-            Amount to add (₦500–₦1,000,000)
+            Amount to add (min ₦3,000)
           </label>
           <div className="mt-2.5 flex items-center gap-2">
             <input
               id="wallet-topup-amount"
               type="number"
-              min={500}
+              min={3000}
               max={1_000_000}
               step={100}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="h-9 min-w-0 flex-1 rounded-[10px] border border-[#e4e4e7] px-2.5 text-[13px] text-ink-soft outline-none focus:border-[#858cec] focus:ring-2 focus:ring-primary/20"
+              className="h-9 min-w-0 flex-1 rounded-[10px] border border-border-muted px-2.5 text-[13px] text-ink-soft outline-none focus:border-primary-ring focus:ring-2 focus:ring-primary/20"
             />
             <SlideCommit
               label="Slide to pay"
