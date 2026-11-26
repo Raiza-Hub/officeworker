@@ -119,6 +119,7 @@ export const threadBillingCandles = query({
     const activities = await ctx.db
       .query("threadActivity")
       .withIndex("by_user_activity", (q) => q.eq("userId", userId))
+      .filter((q) => q.neq(q.field("status"), "draft"))
       .order("desc")
       .take(500);
 
