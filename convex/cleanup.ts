@@ -16,10 +16,12 @@ export const cleanupStaleDraftThreads = internalMutation({
       )
       .paginate({ cursor: args.cursor ?? null, numItems: 50 });
 
-    for (const row of page.page) {
-      await agent.deleteThreadAsync(ctx, { threadId: row.threadId });
-      await ctx.db.delete(row._id);
-    }
+    await Promise.all(
+      page.page.map(async (row) => {
+        await agent.deleteThreadAsync(ctx, { threadId: row.threadId });
+        await ctx.db.delete(row._id);
+      }),
+    );
 
     if (!page.isDone) {
       await ctx.scheduler.runAfter(0, internal.cleanup.cleanupStaleDraftThreads, {

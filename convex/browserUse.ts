@@ -316,23 +316,34 @@ export async function downloadWorkspaceFilesTolerant(args: {
       if (candidates.length === 0) {
         lastError = new Error("No files found in Browser Use workspace yet");
       } else {
+        const fetched = await Promise.all(
+          candidates.map(async (f) => {
+            const url = fileUrlOf(f);
+            if (!url) {
+              return {
+                error: new Error(
+                  `No download URL for workspace file ${filePathOf(f)}`,
+                ) as unknown,
+              };
+            }
+            try {
+              return { bytes: await fetchBytes(url, 90_000) };
+            } catch (e: any) {
+              return { error: e as unknown };
+            }
+          }),
+        );
         const results: Array<{ path: string; bytes: Uint8Array; size: number }> = [];
         let allOk = true;
-        for (const f of candidates) {
-          const path = filePathOf(f);
-          const url = fileUrlOf(f);
-          if (!url) {
+        for (const [index, f] of candidates.entries()) {
+          const outcome = fetched[index]!;
+          if ("error" in outcome) {
             allOk = false;
-            lastError = new Error(`No download URL for workspace file ${path}`);
-            continue;
-          }
-          try {
-            const bytes = await fetchBytes(url, 90_000);
-            results.push({ path, bytes, size: bytes.byteLength });
-          } catch (e: any) {
-            allOk = false;
-            lastError = e;
+            lastError = outcome.error;
             // URL may have expired (~60s) or network failed; refresh by relist next loop.
+          } else {
+            const path = filePathOf(f);
+            results.push({ path, bytes: outcome.bytes, size: outcome.bytes.byteLength });
           }
         }
         if (allOk && results.length > 0) return results;
