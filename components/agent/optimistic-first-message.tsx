@@ -2,16 +2,11 @@
 
 import { StickToBottom } from "use-stick-to-bottom";
 import { Reasoning } from "@/components/agent/reasoning";
-import { UserAttachments, type PreviewAttachment } from "@/components/agent/thread-message-parts";
-import type { ChatAttachment } from "@/lib/attachments";
+import { UserPromptBubble } from "@/components/agent/thread-message-parts";
+import type { PreviewAttachment } from "@/lib/file-preview-types";
+import type { OptimisticFirstMessage } from "./optimistic-first-message-types";
 
-export type OptimisticFirstMessage = {
-  tempId: string;
-  messageId?: string;
-  prompt: string;
-  attachments: ChatAttachment[];
-  createdAt: number;
-};
+export type { OptimisticFirstMessage } from "./optimistic-first-message-types";
 
 export function OptimisticFirstMessageView({
   message,
@@ -28,10 +23,11 @@ export function OptimisticFirstMessageView({
           className="mx-auto flex min-h-full w-full max-w-178 flex-col gap-6"
         >
           <div className="flex w-full flex-col gap-4 items-end">
-            <div className="max-w-[80%] rounded-[14px] rounded-br-sm bg-primary px-3.5 py-2.5 text-sm leading-5.5 text-white">
-              <p className="m-0 whitespace-pre-wrap">{message.prompt}</p>
-              <UserAttachments attachments={message.attachments} onPreview={onPreview} />
-            </div>
+            <UserPromptBubble
+              text={message.prompt}
+              attachments={message.attachments}
+              onPreview={onPreview}
+            />
             <div className="w-full self-start">
               <Reasoning parts={[]} isStreaming startedAt={message.createdAt} />
             </div>

@@ -11,12 +11,7 @@ import ExcelJS from "exceljs";
 import Papa from "papaparse";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import {
-  abortStream,
-  getThreadMetadata,
-  updateThreadMetadata,
-  saveMessage,
-} from "@convex-dev/agent";
+import { abortStream, getThreadMetadata, saveMessage } from "@convex-dev/agent";
 import { createBillingAgent, TITLE_INSTRUCTIONS, cleanTitle } from "./agent";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createR2Client, getR2Config } from "./r2";
@@ -430,23 +425,45 @@ export const generateThreadTitle = internalAction({
   args: {
     threadId: v.string(),
     promptText: v.string(),
+    promptMessageId: v.optional(v.string()),
+    expectedPrompt: v.optional(v.string()),
     reservationId: v.optional(v.id("usageReservations")),
   },
   handler: async (ctx, args) => {
-    await maybeGenerateTitle(ctx, args.threadId, args.promptText, args.reservationId);
+    await maybeGenerateTitle(ctx, {
+      threadId: args.threadId,
+      promptText: args.promptText,
+      promptMessageId: args.promptMessageId,
+      expectedPrompt: args.expectedPrompt,
+      reservationId: args.reservationId,
+    });
   },
 });
 
 const GREETING_ONLY =
   /^(hi|hello|hey|hey there|hi there|good morning|good afternoon|good evening|yo|hola|thanks|thank you|ok|okay|yes|hmm|dear sir|dear ma|how far)[!.]*$/i;
 
+type MaybeGenerateTitleArgs = {
+  threadId: string;
+  promptText: string;
+  promptMessageId?: string;
+  expectedPrompt?: string;
+  reservationId?: Id<"usageReservations">;
+};
+
 async function maybeGenerateTitle(
   ctx: ActionCtx,
-  threadId: string,
-  promptText: string,
-  reservationId?: Id<"usageReservations">,
+  args: MaybeGenerateTitleArgs,
 ): Promise<void> {
+  const { threadId, promptText, reservationId } = args;
   try {
+    if (reservationId) {
+      const reservation = await ctx.runQuery(internal.credits.getReservation, {
+        reservationId,
+      });
+      if (!reservation || reservation.status !== "active") return;
+    }
+
     const metadata = await getThreadMetadata(ctx, components.agent, {
       threadId,
     });
@@ -466,7 +483,7 @@ async function maybeGenerateTitle(
     // truncation fallback is a perfectly good title here.
     const wordCount = promptText.trim().split(/\s+/).filter(Boolean).length;
     if (wordCount < 3 || GREETING_ONLY.test(promptText.trim())) {
-      await applyTitle(ctx, threadId, fallback);
+      await applyTitle(ctx, args, fallback);
       if (reservationId) {
         await ctx.runMutation(internal.credits.releaseReservation, {
           reservationId,
@@ -488,12 +505,12 @@ async function maybeGenerateTitle(
       // Keep the fallback title if both attempts fail.
     }
 
-    await applyTitle(ctx, threadId, title);
-    if (reservationId) {
+    const applied = await applyTitle(ctx, args, title);
+    if (applied && reservationId) {
       const reservation = await ctx.runQuery(internal.credits.getReservation, {
         reservationId,
       });
-      if (reservation) {
+      if (reservation?.status === "active") {
         await ctx.runMutation(internal.credits.enqueueSettlement, {
           reservationId,
           userId: reservation.userId,
@@ -555,16 +572,23 @@ async function generateTitleText(
 // concurrently generated/manual title always wins (industry setTitleIfNull).
 async function applyTitle(
   ctx: ActionCtx,
-  threadId: string,
+  args: MaybeGenerateTitleArgs,
   title: string,
-): Promise<void> {
-  const metadata = await getThreadMetadata(ctx, components.agent, {
-    threadId,
+): Promise<boolean> {
+  const applied = await ctx.runMutation(internal.chat.applyThreadTitle, {
+    threadId: args.threadId,
+    title,
+    promptMessageId: args.promptMessageId,
+    expectedPrompt: args.expectedPrompt,
+    reservationId: args.reservationId,
   });
-  if (metadata.title) return;
-  await updateThreadMetadata(ctx, components.agent, {
-    threadId,
-    patch: { title },
-  });
-  await ctx.runMutation(internal.chat.setThreadTitle, { threadId, title });
+  if (!applied && args.reservationId) {
+    await ctx
+      .runMutation(internal.credits.releaseReservation, {
+        reservationId: args.reservationId,
+        reason: "title_not_applied",
+      })
+      .catch(() => undefined);
+  }
+  return applied;
 }

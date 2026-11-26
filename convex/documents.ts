@@ -62,15 +62,22 @@ export const backfillDocumentFacets = internalMutation({
   args: {},
   handler: async (ctx) => {
     const docs = await ctx.db.query("documents").collect();
-    let updated = 0;
-    for (const doc of docs) {
-      const kind = deriveKind(doc.type, doc.name);
-      const sizeBucket = deriveSizeBucket(doc.size);
-      if (doc.kind === kind && doc.sizeBucket === sizeBucket) continue;
-      await ctx.db.patch(doc._id, { kind, sizeBucket });
-      updated++;
-    }
-    return { updated };
+    const stale = docs
+      .map((doc) => ({
+        doc,
+        kind: deriveKind(doc.type, doc.name),
+        sizeBucket: deriveSizeBucket(doc.size),
+      }))
+      .filter(
+        ({ doc, kind, sizeBucket }) =>
+          doc.kind !== kind || doc.sizeBucket !== sizeBucket,
+      );
+    await Promise.all(
+      stale.map(({ doc, kind, sizeBucket }) =>
+        ctx.db.patch(doc._id, { kind, sizeBucket }),
+      ),
+    );
+    return { updated: stale.length };
   },
 });
 

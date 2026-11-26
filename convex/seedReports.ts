@@ -26,14 +26,11 @@ async function clearSeededReports(
     .query("paymentReports")
     .withIndex("by_user_created", (q) => q.eq("userId", userId))
     .collect();
-  let removed = 0;
-  for (const report of reports) {
-    if (report.reference.startsWith(SEED_REFERENCE_PREFIX)) {
-      await ctx.db.delete(report._id);
-      removed += 1;
-    }
-  }
-  return removed;
+  const seeded = reports.filter((report) =>
+    report.reference.startsWith(SEED_REFERENCE_PREFIX),
+  );
+  await Promise.all(seeded.map((report) => ctx.db.delete(report._id)));
+  return seeded.length;
 }
 
 export const seed = internalMutation({
@@ -66,31 +63,33 @@ export const seed = internalMutation({
     }
 
     const now = Date.now();
-    let open = 0;
-    let resolved = 0;
-
-    for (let index = 0; index < count; index += 1) {
+    const reports = Array.from({ length: count }, (_, index) => {
       const intent = seededIntents[Math.floor(index / 3)]!;
-      const status = index % 4 === 3 ? "resolved" : "open";
+      const status: "open" | "resolved" = index % 4 === 3 ? "resolved" : "open";
+      const paymentStatus: "paid" | "failed" =
+        intent.status === "failed" ? "failed" : "paid";
       const createdAt = now - (index + 1) * DAY_MS - (index % 3) * HOUR_MS;
       const updatedAt =
         status === "resolved"
           ? createdAt + (6 + (index % 5)) * HOUR_MS
           : createdAt;
-      await ctx.db.insert("paymentReports", {
+      return {
         userId,
         intentId: intent._id,
         reference: intent.reference,
         amount: intent.amount,
         plan: normalizeTopupPlan(intent.plan),
-        paymentStatus: intent.status === "failed" ? "failed" : "paid",
+        paymentStatus,
         status,
         createdAt,
         updatedAt,
-      });
-      if (status === "open") open += 1;
-      else resolved += 1;
-    }
+      };
+    });
+    await Promise.all(
+      reports.map((report) => ctx.db.insert("paymentReports", report)),
+    );
+    const open = reports.filter((report) => report.status === "open").length;
+    const resolved = reports.filter((report) => report.status === "resolved").length;
 
     return { email: args.email, count, removed, open, resolved };
   },

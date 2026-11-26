@@ -17,9 +17,6 @@ const workspaceSchema = z.object({
 
 type WorkspaceFields = z.infer<typeof workspaceSchema>;
 
-const fieldClassName =
-  "h-11 w-100 max-w-full rounded-xl border border-[#dedfe3] bg-white px-4 text-[13px] leading-normal font-normal tracking-normal text-ink-deep outline-none transition-[border-color,box-shadow] placeholder:text-[#a0a3aa] hover:border-[#c7c9cf] focus:border-[#7279dc] focus:ring-4 focus:ring-[#7279dc]/10 disabled:cursor-not-allowed disabled:border-[#e5e6e9] disabled:bg-[#f7f7f8] disabled:text-[#81848c] disabled:opacity-100 motion-reduce:transition-none";
-
 function EyeIcon({ visible }: { visible: boolean }) {
   return (
     <svg
@@ -119,7 +116,7 @@ export function WorkspaceForm() {
               placeholder="https://portal.example.com/login"
               aria-invalid={Boolean(errors.portalUrl)}
               aria-describedby={errors.portalUrl ? "portal-url-error" : undefined}
-              className={fieldClassName}
+              className="h-11 w-100 max-w-full rounded-xl border border-[#dedfe3] bg-white px-4 text-[13px] leading-normal font-normal tracking-normal text-ink-deep outline-none transition-[border-color,box-shadow] placeholder:text-[#a0a3aa] hover:border-[#c7c9cf] focus:border-[#7279dc] focus:ring-4 focus:ring-[#7279dc]/10 disabled:cursor-not-allowed disabled:border-[#e5e6e9] disabled:bg-[#f7f7f8] disabled:text-[#81848c] disabled:opacity-100 motion-reduce:transition-none"
             />
             {errors.portalUrl && (
               <p id="portal-url-error" role="alert" className="mb-0 mt-2 text-[13px] text-danger-text">
@@ -142,7 +139,7 @@ export function WorkspaceForm() {
               autoComplete="email"
               aria-invalid={Boolean(errors.email)}
               aria-describedby={errors.email ? "email-error" : undefined}
-              className={fieldClassName}
+              className="h-11 w-100 max-w-full rounded-xl border border-[#dedfe3] bg-white px-4 text-[13px] leading-normal font-normal tracking-normal text-ink-deep outline-none transition-[border-color,box-shadow] placeholder:text-[#a0a3aa] hover:border-[#c7c9cf] focus:border-[#7279dc] focus:ring-4 focus:ring-[#7279dc]/10 disabled:cursor-not-allowed disabled:border-[#e5e6e9] disabled:bg-[#f7f7f8] disabled:text-[#81848c] disabled:opacity-100 motion-reduce:transition-none"
             />
             {errors.email && (
               <p id="email-error" role="alert" className="mb-0 mt-2 text-[13px] text-danger-text">
@@ -166,7 +163,7 @@ export function WorkspaceForm() {
                 autoComplete="current-password"
                 aria-invalid={Boolean(errors.password)}
                 aria-describedby={errors.password ? "password-error" : undefined}
-                className={`${fieldClassName} pr-14`}
+                className="h-11 w-100 max-w-full rounded-xl border border-[#dedfe3] bg-white px-4 text-[13px] leading-normal font-normal tracking-normal text-ink-deep outline-none transition-[border-color,box-shadow] placeholder:text-[#a0a3aa] hover:border-[#c7c9cf] focus:border-[#7279dc] focus:ring-4 focus:ring-[#7279dc]/10 disabled:cursor-not-allowed disabled:border-[#e5e6e9] disabled:bg-[#f7f7f8] disabled:text-[#81848c] disabled:opacity-100 motion-reduce:transition-none pr-14"
               />
               <button
                 type="button"

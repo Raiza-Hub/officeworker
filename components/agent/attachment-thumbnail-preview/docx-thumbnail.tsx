@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useObjectUrl } from "@/hooks/use-object-url";
 import {
   createDocxThumbnailRenderer,
   parseDocxForViewer,
@@ -13,13 +14,13 @@ export function DocxAttachmentThumbnail({
   fileUrl,
   isUploading,
 }: AttachmentThumbnailPreviewProps) {
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [coverBlob, setCoverBlob] = useState<Blob | null>(null);
+  const coverUrl = useObjectUrl(coverBlob);
   const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     if (!fileUrl) return;
     let cancelled = false;
-    let objectUrl: string | null = null;
     let renderer: ReturnType<typeof createDocxThumbnailRenderer> | null = null;
     void (async () => {
       try {
@@ -45,8 +46,7 @@ export function DocxAttachmentThumbnail({
         });
         if (cancelled) return;
         if (result.blob) {
-          objectUrl = URL.createObjectURL(result.blob);
-          setCoverUrl(objectUrl);
+          setCoverBlob(result.blob);
         } else {
           setHasError(true);
         }
@@ -56,7 +56,6 @@ export function DocxAttachmentThumbnail({
     })();
     return () => {
       cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
       const currentRenderer = renderer;
       setTimeout(() => {
         currentRenderer?.dispose();

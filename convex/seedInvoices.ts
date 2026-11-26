@@ -21,14 +21,11 @@ async function clearSeededInvoices(
     .query("topupIntents")
     .withIndex("by_user_created", (q) => q.eq("userId", userId))
     .collect();
-  let removed = 0;
-  for (const intent of intents) {
-    if (intent.reference.startsWith(SEED_REFERENCE_PREFIX)) {
-      await ctx.db.delete(intent._id);
-      removed += 1;
-    }
-  }
-  return removed;
+  const seeded = intents.filter((intent) =>
+    intent.reference.startsWith(SEED_REFERENCE_PREFIX),
+  );
+  await Promise.all(seeded.map((intent) => ctx.db.delete(intent._id)));
+  return seeded.length;
 }
 
 export const seed = internalMutation({
@@ -46,28 +43,31 @@ export const seed = internalMutation({
     const removed = await clearSeededInvoices(ctx, userId);
     const now = Date.now();
     const baseAmount = 2_000 + ((now % 7) + 1) * 250;
-    let paid = 0;
-    let failed = 0;
-
-    for (let index = 0; index < count; index += 1) {
-      const status = index % 10 === 9 ? "failed" : "paid";
+    const invoices = Array.from({ length: count }, (_, index) => {
+      const status: "paid" | "failed" = index % 10 === 9 ? "failed" : "paid";
+      const plan: "pro" | "basic" = index % 3 === 0 ? "pro" : "basic";
+      const gatewayStatus: "success" | "failed" =
+        status === "paid" ? "success" : "failed";
       const createdAt = now - index * DAY_MS - (index % 3) * 60 * 60 * 1000;
-      await ctx.db.insert("topupIntents", {
+      return {
         userId,
         reference: `${SEED_REFERENCE_PREFIX}${String(index + 1).padStart(2, "0")}`,
         amount: baseAmount + ((index * 1_750) % 48_000),
-        plan: index % 3 === 0 ? "pro" : "basic",
+        plan,
         status,
         createdAt,
         paidAt: status === "paid" ? createdAt : undefined,
         updatedAt: createdAt,
         paymentMethod: "Seed",
-        gatewayStatus: status === "paid" ? "success" : "failed",
+        gatewayStatus,
         currency: "NGN",
-      });
-      if (status === "paid") paid += 1;
-      else failed += 1;
-    }
+      };
+    });
+    await Promise.all(
+      invoices.map((invoice) => ctx.db.insert("topupIntents", invoice)),
+    );
+    const paid = invoices.filter((invoice) => invoice.status === "paid").length;
+    const failed = invoices.filter((invoice) => invoice.status === "failed").length;
 
     return { email: args.email, count, removed, paid, failed };
   },

@@ -1,6 +1,6 @@
 import type { Editor as DocxEditorInstance } from "@docx-editor.dev/react";
 import type { PptxEditorInstance } from "@pptx-editor.dev/react";
-import type { XlsxViewerSaveApi } from "@/components/agent/spreadsheet-preview";
+import type { XlsxViewerSaveApi } from "@/lib/file-preview-types";
 import type { CsvViewerSaveApi } from "@/components/extend/csv-viewer";
 import { fetchDownloadUrl } from "@/components/agent/preview-url-cache";
 import { downloadBlob, downloadFileUrl } from "@/lib/download";

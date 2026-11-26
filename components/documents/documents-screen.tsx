@@ -2,7 +2,7 @@
 
 import { AgentChatHeader } from "@/components/agent/agent-chat-header";
 import { DocumentView } from "@/components/documents/document-view";
-import { DocumentUploadsProvider } from "@/components/documents/document-uploads-context";
+import { DocumentUploadsProvider } from "@/store/document-uploads";
 import { UploadDocumentsButton } from "@/components/documents/upload-documents-button";
 
 export function DocumentsScreen() {

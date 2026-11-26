@@ -99,8 +99,10 @@ export async function ensureActiveBillingCore(
     createdAt: now(),
     updatedAt: now(),
   });
-  const config = await ctx.db.get(configId);
-  const fxRate = await ctx.db.get(seedId);
+  const [config, fxRate] = await Promise.all([
+    ctx.db.get(configId),
+    ctx.db.get(seedId),
+  ]);
   if (!config || !fxRate) throw new Error("Failed to initialize billing config");
   if (active) await ctx.db.patch(active._id, { active: false, updatedAt: now() });
   return { config, fxRate };
@@ -1044,19 +1046,21 @@ export const processSettlementOutbox = internalMutation({
         q.eq("status", "pending").lte("nextAttemptAt", now()),
       )
       .take(25);
-    for (const item of pending) {
-      await ctx.db.patch(item._id, {
-        attempts: item.attempts + 1,
-        updatedAt: now(),
-      });
-      await ctx.scheduler.runAfter(0, internal.credits.settleReservation, {
-        reservationId: item.reservationId,
-        providerCostUsd: item.providerCostUsd,
-        providerRef: item.providerRef,
-        usage: item.usage,
-        idempotencyKey: item.idempotencyKey,
-      });
-    }
+    await Promise.all(
+      pending.map(async (item) => {
+        await ctx.db.patch(item._id, {
+          attempts: item.attempts + 1,
+          updatedAt: now(),
+        });
+        await ctx.scheduler.runAfter(0, internal.credits.settleReservation, {
+          reservationId: item.reservationId,
+          providerCostUsd: item.providerCostUsd,
+          providerRef: item.providerRef,
+          usage: item.usage,
+          idempotencyKey: item.idempotencyKey,
+        });
+      }),
+    );
     return { scheduled: pending.length };
   },
 });
@@ -1067,38 +1071,40 @@ export const cancelActiveWorkForUser = internalAction({
     const active = await ctx.runQuery(internal.credits.listActiveReservations, {
       userId: args.userId,
     });
-    for (const reservation of active) {
-      const metadata =
-        reservation.metadata && typeof reservation.metadata === "object"
-          ? (reservation.metadata as Record<string, unknown>)
-          : {};
-      if (reservation.operation === "browser_use" && reservation.providerRef) {
-        try {
-          await ctx.runAction(internal.browserUseJobs.cancelRunForBilling, {
-            runId: reservation.providerRef,
-          });
-        } catch (error) {
-          console.error("billing browser cancellation failed", error);
+    await Promise.all(
+      active.map(async (reservation) => {
+        const metadata =
+          reservation.metadata && typeof reservation.metadata === "object"
+            ? (reservation.metadata as Record<string, unknown>)
+            : {};
+        if (reservation.operation === "browser_use" && reservation.providerRef) {
+          try {
+            await ctx.runAction(internal.browserUseJobs.cancelRunForBilling, {
+              runId: reservation.providerRef,
+            });
+          } catch (error) {
+            console.error("billing browser cancellation failed", error);
+          }
+        } else if (
+          typeof metadata.threadId === "string" &&
+          typeof metadata.order === "number"
+        ) {
+          try {
+            await abortStream(ctx, components.agent, {
+              threadId: metadata.threadId,
+              order: metadata.order,
+              reason: "Out of credits",
+            });
+          } catch (error) {
+            console.error("billing stream cancellation failed", error);
+          }
         }
-      } else if (
-        typeof metadata.threadId === "string" &&
-        typeof metadata.order === "number"
-      ) {
-        try {
-          await abortStream(ctx, components.agent, {
-            threadId: metadata.threadId,
-            order: metadata.order,
-            reason: "Out of credits",
-          });
-        } catch (error) {
-          console.error("billing stream cancellation failed", error);
-        }
-      }
-      await ctx.runMutation(internal.credits.releaseReservation, {
-        reservationId: reservation._id,
-        reason: "balance_depleted",
-      });
-    }
+        await ctx.runMutation(internal.credits.releaseReservation, {
+          reservationId: reservation._id,
+          reason: "balance_depleted",
+        });
+      }),
+    );
     return { cancelled: active.length };
   },
 });

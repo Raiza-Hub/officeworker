@@ -2,7 +2,7 @@
 
 import { Plus, Upload } from "lucide-react";
 import { useRef, type ChangeEvent } from "react";
-import { useDocumentUploads } from "@/components/documents/document-uploads-context";
+import { useDocumentUploads } from "@/store/document-uploads";
 
 type UploadDocumentsButtonProps = {
   label?: string;

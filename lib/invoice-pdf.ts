@@ -20,8 +20,10 @@ export async function buildInvoicePdfBytes(invoice: InvoiceData): Promise<ArrayB
   const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  const regularFont = await pdf.embedFont(StandardFonts.Helvetica);
-  const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const [regularFont, boldFont] = await Promise.all([
+    pdf.embedFont(StandardFonts.Helvetica),
+    pdf.embedFont(StandardFonts.HelveticaBold),
+  ]);
 
   const margin = 56;
   const ink = rgb(0.11, 0.12, 0.15);

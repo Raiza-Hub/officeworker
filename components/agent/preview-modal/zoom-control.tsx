@@ -2,9 +2,6 @@
 
 import { CircleMinus, CirclePlusIcon, Maximize } from "lucide-react";
 
-const iconButtonClass =
-  "inline-flex size-7 items-center justify-center rounded-full text-text-dim-soft transition-colors hover:bg-[#f1f3f4] hover:text-[#202124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-40";
-
 export function ZoomControl({
   zoom,
   canZoomIn = true,
@@ -30,7 +27,7 @@ export function ZoomControl({
         title="Zoom out"
         disabled={!canZoomOut}
         onClick={onZoomOut}
-        className={iconButtonClass}
+        className="inline-flex size-7 items-center justify-center rounded-full text-text-dim-soft transition-colors hover:bg-[#f1f3f4] hover:text-[#202124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-40"
       >
         <CircleMinus aria-hidden="true" className="size-3.5 shrink-0" />
       </button>
@@ -43,7 +40,7 @@ export function ZoomControl({
         title="Zoom in"
         disabled={!canZoomIn}
         onClick={onZoomIn}
-        className={iconButtonClass}
+        className="inline-flex size-7 items-center justify-center rounded-full text-text-dim-soft transition-colors hover:bg-[#f1f3f4] hover:text-[#202124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-40"
       >
         <CirclePlusIcon aria-hidden="true" className="size-3.5 shrink-0" />
       </button>
@@ -53,7 +50,7 @@ export function ZoomControl({
           aria-label={fitLabel}
           title={fitLabel}
           onClick={onFit}
-          className={iconButtonClass}
+          className="inline-flex size-7 items-center justify-center rounded-full text-text-dim-soft transition-colors hover:bg-[#f1f3f4] hover:text-[#202124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Maximize aria-hidden="true" className="size-3.5 shrink-0" />
         </button>
