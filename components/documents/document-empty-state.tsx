@@ -49,7 +49,7 @@ function NotionMark() {
 export function DocumentEmptyState({ hasActiveFilters }: { hasActiveFilters?: boolean }) {
   if (hasActiveFilters) {
     return (
-      <div className="mt-8 rounded-[9px] border border-dashed border-[#dedee3] px-6 py-6 text-xs font-medium text-text-dim">
+      <div className="mt-4 rounded-[9px] border border-dashed border-[#dedee3] px-6 py-6 text-xs font-medium text-text-dim">
         No documents match your filters
       </div>
     );

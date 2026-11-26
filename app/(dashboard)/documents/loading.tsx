@@ -11,9 +11,10 @@ export default function Loading() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto bg-agent-page-bg">
-        <div className="w-full px-4.5 pt-2 pb-10">
-          <div className="flex h-8.5 w-full shrink-0 items-center justify-start">
-            <div className="h-8 w-75 animate-pulse rounded-lg bg-secondary" />
+        <div className="w-full px-2 pt-2 pb-10">
+          <div className="flex h-8.5 w-full shrink-0 items-center justify-end gap-1.5">
+            <div className="size-7 animate-pulse rounded-full bg-secondary" />
+            <div className="size-7 animate-pulse rounded-full bg-secondary" />
           </div>
 
           <DocumentGridSkeleton />

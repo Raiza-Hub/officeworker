@@ -73,7 +73,7 @@ export function AttachmentPreviewContent({
       />
       <span
         title={attachment.name}
-        className={`mt-1 block w-full text-left text-[11px] leading-4 text-text-secondary ${nameLines === 2 ? "line-clamp-2 break-words" : "truncate"}`}
+        className={`mt-1 block w-full text-left [color:var(--attachment-name-color,#45474e)] [font-size:var(--attachment-name-size,11px)] [font-weight:var(--attachment-name-weight,400)] [line-height:var(--attachment-name-leading,16px)] ${nameLines === 2 ? "line-clamp-2 break-words" : "truncate"}`}
       >
         {attachment.name}
       </span>
