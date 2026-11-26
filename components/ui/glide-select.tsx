@@ -1,60 +1,26 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import type {
+  CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+} from "react";
+import { ChevronDown } from "lucide-react";
 import "./glide-select.css";
+import { GlideSelectMenu } from "./glide-select-menu";
+import {
+  norm,
+  typeaheadIndex,
+  SIZES,
+  PAD,
+  GAP,
+  MENU_GAP,
+  DEFAULT_OPTIONS,
+} from "./glide-select-utils";
+import type { GlideSelectProps } from "./glide-select-utils";
 
-const SIZES = {
-  sm: { chip: 28, row: 26, font: 12 },
-  md: { chip: 32, row: 30, font: 13 },
-  lg: { chip: 44, row: 40, font: 14 },
-} as const;
-
-const PAD = 4;
-const GAP = 1;
-const MENU_GAP = 6;
-const DEFAULT_OPTIONS = ["One", "Two", "Three"];
-
-type NormalizedOption = { value: string; label: ReactNode; tag?: string };
-export type GlideSelectOption = string | NormalizedOption;
-
-const norm = (o: GlideSelectOption): NormalizedOption =>
-  typeof o === "string" ? { value: o, label: o } : o;
-const textOf = (it: NormalizedOption) =>
-  typeof it.label === "string" ? it.label : it.value;
-const typeaheadIndex = (items: NormalizedOption[], from: number, ch: string) => {
-  const c = ch.toLowerCase();
-  const n = items.length;
-  for (let k = 1; k <= n; k++) {
-    const i = (from + k) % n;
-    if (textOf(items[i]).toLowerCase().startsWith(c)) return i;
-  }
-  return from;
-};
-
-export type GlideSelectProps = {
-  options?: GlideSelectOption[];
-  value?: string;
-  defaultValue?: string;
-  onChange?: (value: string, option: NormalizedOption) => void;
-  placeholder?: string;
-  showTags?: boolean;
-  accentColor?: string;
-  surfaceColor?: string;
-  highlightColor?: string;
-  textColor?: string;
-  size?: "sm" | "md" | "lg";
-  radius?: number;
-  menuWidth?: number;
-  placement?: "top" | "bottom";
-  align?: "left" | "right";
-  popDuration?: number;
-  glideDuration?: number;
-  rememberPosition?: boolean;
-  disabled?: boolean;
-  ariaLabel?: string;
-  className?: string;
-};
+export type { GlideSelectOption, GlideSelectProps } from "./glide-select-utils";
 
 export default function GlideSelect({
   options = DEFAULT_OPTIONS,
@@ -176,7 +142,7 @@ export default function GlideSelect({
     triggerRef.current?.focus({ preventScroll: true });
   };
 
-  const onTriggerKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+  const onTriggerKey = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
     const k = e.key;
     const n = items.length;
     const cur = active ?? Math.max(0, selected);
@@ -223,7 +189,7 @@ export default function GlideSelect({
     const i = Math.floor((y - s.top - PAD) / step);
     return i >= 0 && i < items.length ? i : null;
   };
-  const onListDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onListDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (scrub.current) return;
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -232,19 +198,19 @@ export default function GlideSelect({
     instant.current = true;
     setActive(rowAt(e.clientY));
   };
-  const onListMove = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onListMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!scrub.current || scrub.current.id !== e.pointerId) return;
     const i = rowAt(e.clientY);
     if (i !== active) setActive(i);
   };
-  const onListUp = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onListUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!scrub.current || scrub.current.id !== e.pointerId) return;
     const i = e.type === "pointerup" ? rowAt(e.clientY) : null;
     scrub.current = null;
     if (i !== null) pick(i, false);
     else if (!rememberPosition) setActive(null);
   };
-  const onListOver = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onListOver = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "touch" || scrub.current) return;
     const row = (e.target as HTMLElement).closest("[data-index]") as HTMLElement | null;
     if (!row) return;
@@ -274,7 +240,7 @@ export default function GlideSelect({
         "--gs-pop-out": `${popOut}ms`,
         "--gs-glide": `${glideDuration}ms`,
         "--gs-origin": origin,
-      } as React.CSSProperties}
+      } as CSSProperties}
       onAnimationEnd={(e) => {
         if (e.animationName === "gs-swap" && rootRef.current)
           delete rootRef.current.dataset.swap;
@@ -307,52 +273,27 @@ export default function GlideSelect({
         </span>
       </button>
       {phase !== "closed" ? (
-        <div
-          ref={menuRef}
-          className="glide-select__menu"
-          data-state="open"
-          data-side={side}
-          data-align={align}
-        >
-          <div
-            id={`${id}-list`}
-            role="listbox"
-            aria-label={ariaLabel}
-            className="glide-select__list"
-            data-live={active !== null ? "" : undefined}
-            onPointerOver={onListOver}
-            onPointerLeave={() => {
-              if (!scrub.current && !rememberPosition) setActive(null);
-            }}
-            onPointerDown={onListDown}
-            onPointerMove={onListMove}
-            onPointerUp={onListUp}
-            onPointerCancel={onListUp}
-            onLostPointerCapture={onListUp}
-          >
-            <span ref={pillRef} className="glide-select__pill" aria-hidden="true" />
-            {items.map((it, i) => (
-              <div
-                key={it.value}
-                id={`${id}-${i}`}
-                role="option"
-                aria-selected={i === selected}
-                data-index={i}
-                className="glide-select__option"
-              >
-                <span className="glide-select__name">{it.label}</span>
-                {showTags && it.tag ? <span className="glide-select__tag">{it.tag}</span> : null}
-                <span
-                  className="glide-select__check"
-                  data-on={i === selected ? "" : undefined}
-                  aria-hidden="true"
-                >
-                  <Check size={13} strokeWidth={2.5} />
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <GlideSelectMenu
+          id={id}
+          items={items}
+          active={active}
+          selected={selected}
+          showTags={showTags}
+          side={side}
+          align={align}
+          ariaLabel={ariaLabel}
+          menuRef={menuRef}
+          pillRef={pillRef}
+          onPointerOver={onListOver}
+          onPointerLeave={() => {
+            if (!scrub.current && !rememberPosition) setActive(null);
+          }}
+          onPointerDown={onListDown}
+          onPointerMove={onListMove}
+          onPointerUp={onListUp}
+          onPointerCancel={onListUp}
+          onLostPointerCapture={onListUp}
+        />
       ) : null}
     </div>
   );

@@ -1,6 +1,14 @@
 "use client"
 
 import * as React from "react"
+import { cn } from "@/lib/utils"
+import {
+  hasRevealedPreviewImageUrl,
+  markRevealedPreviewImageUrl,
+  releaseRevealedPreviewImageUrl,
+} from "@/lib/file-thumbnail-store"
+import { getThumbnailDisplayState } from "@/lib/file-thumbnail-utils"
+import { FileThumbnailLoadingOverlay } from "./file-thumbnail-loading-overlay"
 
 export type ThumbnailFile = {
   name: string
@@ -16,23 +24,6 @@ export type FileThumbnailProps = {
   isLoading?: boolean
   hasError?: boolean
 }
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ")
-}
-// Preview URLs that have completed a reveal this session. View/tab switches
-// remount thumbnails; URLs in this set render instantly instead of replaying
-// the blur-in, so only an image's first load animates.
-const revealedPreviewImageUrls = new Set<string>()
-export function FileThumbnailLoadingOverlay() {
-  return (
-    <div
-      aria-hidden="true"
-      className="absolute inset-0 z-10 overflow-hidden bg-background"
-    >
-      <div className="absolute inset-0 animate-pulse bg-muted motion-reduce:animate-none" />
-    </div>
-  )
-}
 export function FileThumbnail({
   className,
   previewAspectRatio,
@@ -47,27 +38,21 @@ export function FileThumbnail({
   const [loadedPreviewImageUrl, setLoadedPreviewImageUrl] = React.useState<
     string | null
   >(() =>
-    previewImageUrl && revealedPreviewImageUrls.has(previewImageUrl)
+    previewImageUrl && hasRevealedPreviewImageUrl(previewImageUrl)
       ? previewImageUrl
       : null
   )
   const [failedPreviewImageUrl, setFailedPreviewImageUrl] = React.useState<
     string | null
   >(null)
-  const imageFailed = Boolean(
-    previewImageUrl && failedPreviewImageUrl === previewImageUrl
-  )
-  const isImageLoading = Boolean(
-    previewImageUrl &&
-      loadedPreviewImageUrl !== previewImageUrl &&
-      !imageFailed &&
-      !revealedPreviewImageUrls.has(previewImageUrl)
-  )
-  const showLoading = isLoading || isImageLoading
-  const hasPreviewContent = Boolean(previewContent)
-  const showFallback =
-    !showLoading &&
-    (hasError || imageFailed || (!previewImageUrl && !hasPreviewContent))
+  const { showLoading, showFallback } = getThumbnailDisplayState({
+    isLoading,
+    hasError,
+    previewImageUrl,
+    previewContent,
+    loadedPreviewImageUrl,
+    failedPreviewImageUrl,
+  })
   const cancelImageReveal = React.useCallback(() => {
     if (revealFrameRef.current === null) return
     window.cancelAnimationFrame(revealFrameRef.current)
@@ -79,7 +64,7 @@ export function FileThumbnail({
       const didLoad = image.naturalWidth > 0 && image.naturalHeight > 0
       setFailedPreviewImageUrl(didLoad ? null : imageUrl)
       if (didLoad) {
-        revealedPreviewImageUrls.add(imageUrl)
+        markRevealedPreviewImageUrl(imageUrl)
         cancelImageReveal()
         revealFrameRef.current = window.requestAnimationFrame(() => {
           revealFrameRef.current = window.requestAnimationFrame(() => {
@@ -104,13 +89,13 @@ export function FileThumbnail({
   }, [markImageLoaded, previewImageUrl])
   return (
     <div
-      className={cx(
+      className={cn(
         "group overflow-hidden rounded-lg border bg-background text-foreground",
         className
       )}
     >
       <div
-        className={cx(
+        className={cn(
           "relative aspect-square overflow-hidden bg-muted [contain:layout_paint]",
           previewClassName
         )}
@@ -129,7 +114,7 @@ export function FileThumbnail({
             draggable={false}
             loading="lazy"
             decoding="async"
-            className={cx(
+            className={cn(
               "absolute inset-0 block size-full object-cover transition-[opacity,filter] duration-160 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
               showLoading ? "opacity-0 blur-sm" : "blur-0 opacity-100"
             )}
@@ -138,7 +123,7 @@ export function FileThumbnail({
             }}
             onError={() => {
               if (previewImageUrl) {
-                revealedPreviewImageUrls.delete(previewImageUrl)
+                releaseRevealedPreviewImageUrl(previewImageUrl)
                 cancelImageReveal()
                 setFailedPreviewImageUrl(previewImageUrl)
                 setLoadedPreviewImageUrl((currentUrl) =>
@@ -150,7 +135,7 @@ export function FileThumbnail({
         ) : null}
         {previewContent ? (
           <div
-            className={cx(
+            className={cn(
               "absolute inset-0 size-full transition-[opacity,filter] duration-160 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
               showLoading ? "opacity-0 blur-sm" : "blur-0 opacity-100"
             )}

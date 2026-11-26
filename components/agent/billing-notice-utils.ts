@@ -1,17 +1,13 @@
-"use client";
-
-import Link from "next/link";
-
 export type BillingNoticeCode =
   | "WALLET_EMPTY"
   | "INSUFFICIENT_CREDITS"
   | "PLAN_UPGRADE_REQUIRED";
 
 export type BillingNoticeData = {
-  code: BillingNoticeCode;
+  code: BillingNoticeCode | "EDITING";
   message: string;
-  actionLabel: string;
-  href: string;
+  actionLabel?: string;
+  href?: string;
 };
 
 export function billingNoticeForError(
@@ -61,21 +57,4 @@ export function billingNoticeForError(
     };
   }
   return null;
-}
-
-export function BillingNotice({ notice }: { notice: BillingNoticeData }) {
-  return (
-    <div
-      role="alert"
-      className="mb-3 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg bg-[#f3f4f5] px-3 py-2.5 text-[13px]"
-    >
-      <span className="text-danger-text">{notice.message}</span>
-      <Link
-        href={notice.href}
-        className="shrink-0 font-semibold text-danger-text underline underline-offset-2 hover:opacity-80"
-      >
-        {notice.actionLabel}
-      </Link>
-    </div>
-  );
 }

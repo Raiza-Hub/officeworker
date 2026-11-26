@@ -1,49 +1,8 @@
 import { useEffect, useState } from "react";
-import { useSmoothText } from "@convex-dev/agent/react";
-import { ChevronDown, Loader, Wifi } from "lucide-react";
-import { ActivityRow } from "@/components/agent/activity-row";
+import { ChevronDown, Loader } from "lucide-react";
 import { isToolPart, partText, type UIMessagePartList } from "@/components/agent/parts";
-import { ShimmerText } from "@/components/agent/shimmer";
-
-function formatDuration(milliseconds: number) {
-  const seconds = Math.round(milliseconds / 1000);
-  return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
-}
-
-function ActivityText({ text }: { text: string }) {
-  const [visibleText] = useSmoothText(text.trimStart());
-  const displayText = visibleText.trim();
-  if (!displayText) return null;
-
-  return (
-    <p className="m-0 max-w-none whitespace-pre-wrap text-sm leading-5.5 text-ink">
-      {displayText}
-    </p>
-  );
-}
-
-function ActivityContent({ parts }: { parts: UIMessagePartList }) {
-  return (
-    <div className="mt-2 flex flex-col gap-2 border-l border-border pl-3">
-      {parts.map((part, index) => {
-        if (part.type === "text") {
-          const text = partText(part);
-          return text ? <ActivityText key={`text-${index}`} text={text} /> : null;
-        }
-        if (isToolPart(part)) {
-          return (
-            <ActivityRow
-              key={`${part.type}-${index}`}
-              part={part}
-              toolName={part.type.replace("tool-", "")}
-            />
-          );
-        }
-        return null;
-      })}
-    </div>
-  );
-}
+import { ActivityContent } from "./activity-content";
+import { ReasoningLabel } from "./reasoning-label";
 
 export function Reasoning({
   parts,
@@ -85,29 +44,16 @@ export function Reasoning({
     return () => window.clearInterval(timer);
   }, [startedAt, streaming]);
 
-  const label = streaming ? (
-    <>
-      {reconnecting ? (
-        <span className="inline-flex items-center gap-1.5">
-          <Wifi aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={2} />
-          <ShimmerText>
-            {connectionRetries > 0
-              ? `Reconnecting · retry ${connectionRetries}`
-              : "Reconnecting…"}
-          </ShimmerText>
-        </span>
-      ) : isResponseStreaming ? (
-        <span>Working for {formatDuration(elapsed ?? 0)}</span>
-      ) : (
-        <ShimmerText>Thinking…</ShimmerText>
-      )}
-    </>
-  ) : cancelled ? (
-    <span>User cancelled</span>
-  ) : durationMs !== undefined ? (
-    <span>Worked for {formatDuration(durationMs)}</span>
-  ) : (
-    <ShimmerText>Thinking…</ShimmerText>
+  const label = (
+    <ReasoningLabel
+      streaming={streaming}
+      reconnecting={reconnecting}
+      connectionRetries={connectionRetries}
+      isResponseStreaming={isResponseStreaming}
+      elapsed={elapsed}
+      cancelled={cancelled}
+      durationMs={durationMs}
+    />
   );
 
   const showDisclosure = hasNarration && !streaming;

@@ -1,9 +1,6 @@
 import { DangerZoneSection } from "@/components/profile/danger-zone-section";
 import { ProfileHeading } from "@/components/profile/profile-heading";
 
-const sectionHeadingClassName =
-  "m-0 h-[23px] px-4 text-[15px] leading-[23px] font-medium text-ink-soft";
-
 export function ProfileIdentityLoading() {
   return (
     <div className="flex flex-col items-center">
@@ -17,7 +14,7 @@ export function ProfileIdentityLoading() {
 export function WorkspaceAccessSectionLoading() {
   return (
     <section className="mt-9 pt-3">
-      <h2 className={sectionHeadingClassName}>Workspace access</h2>
+      <h2 className="m-0 h-[23px] px-4 text-[15px] leading-[23px] font-medium text-ink-soft">Workspace access</h2>
       <p className="m-0 mt-1 px-4 text-[13px] leading-5.5 font-[450] text-text-tertiary">
         Manage your access to this workspace
       </p>

@@ -1,15 +1,14 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import type { ActiveTurn } from "@/store/edit-message";
 
 type ThreadTitleValue = {
   title: string | null | undefined;
-  setTitle: (title: string | null | undefined) => void;
 };
 
 const ThreadTitleContext = createContext<ThreadTitleValue>({
   title: undefined,
-  setTitle: () => undefined,
 });
 
 export function useThreadTitle(): ThreadTitleValue {
@@ -20,18 +19,12 @@ export { ThreadTitleContext };
 
 type MessagesStatusValue = {
   status: string;
-  setStatus: (status: string) => void;
-  activeTurn: { promptMessageId: string; order: number } | null;
-  setActiveTurn: (
-    turn: { promptMessageId: string; order: number } | null,
-  ) => void;
+  activeTurn: ActiveTurn | null;
 };
 
 const MessagesStatusContext = createContext<MessagesStatusValue>({
   status: "LoadingFirstPage",
-  setStatus: () => undefined,
   activeTurn: null,
-  setActiveTurn: () => undefined,
 });
 
 export function useMessagesStatus(): MessagesStatusValue {

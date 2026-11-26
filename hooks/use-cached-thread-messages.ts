@@ -19,7 +19,7 @@ export function useCachedThreadMessages({
   const [cursors, setCursors] = useState<Array<string | null>>([null]);
   const queries = useMemo(
     () =>
-      cacheScope
+      cacheScope && threadId
         ? Object.fromEntries(
             cursors.map((cursor, index) => [
               `page${index}`,

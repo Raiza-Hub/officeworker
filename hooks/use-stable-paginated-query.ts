@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import { useConvexAuth } from "convex/react";
 import { usePaginatedQuery } from "convex-helpers/react/cache/hooks";
 import { api } from "@/convex/_generated/api";
@@ -22,14 +22,14 @@ type StableDocumentSearch = {
   searchTerm: string;
 };
 
+const liveSnapshots = new WeakMap<object, StableDocumentSearch>();
+
 /**
  * Adapted from useStablePaginatedQuery in get-convex/convex-helpers
  * (https://stack.convex.dev/help-my-app-is-overreacting): when the search
  * term changes, it keeps returning the previously loaded results until the
  * new first page has loaded, so the list does not flash empty mid-refetch.
  * The returned results are paired with the search term they were fetched for.
- * The render-phase ref capture is the stable-results mechanic from that
- * official recipe, hence the two scoped react-hooks rule dispositions below.
  */
 export function useStableDocumentSearch(
   searchTerm: string,
@@ -46,15 +46,18 @@ export function useStableDocumentSearch(
   });
   const isLive =
     result.status !== "LoadingFirstPage" && result.status !== "LoadingMore";
-  const live: StableDocumentSearch = {
-    results: result.results,
-    status: result.status,
-    loadMore: result.loadMore,
-    searchTerm,
-  };
-  const stored = useRef(live);
-  // eslint-disable-next-line react-hooks/refs -- deliberate snapshot capture, see comment above
-  if (isLive) stored.current = live;
-  // eslint-disable-next-line react-hooks/refs -- stale snapshot is returned while loading
-  return stored.current;
+  const live = useMemo<StableDocumentSearch>(
+    () => ({
+      results: result.results,
+      status: result.status,
+      loadMore: result.loadMore,
+      searchTerm,
+    }),
+    [result.results, result.status, result.loadMore, searchTerm],
+  );
+  const snapshotKey = useMemo(() => ({}), []);
+  useEffect(() => {
+    if (isLive) liveSnapshots.set(snapshotKey, live);
+  }, [isLive, live, snapshotKey]);
+  return isLive ? live : (liveSnapshots.get(snapshotKey) ?? live);
 }

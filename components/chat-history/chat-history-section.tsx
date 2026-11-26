@@ -24,39 +24,59 @@ export function ChatHistorySection() {
           strokeWidth={2.25}
         />
       </button>
-      <AnimatePresence initial={false}>
-        {isExpanded && (
-          <m.div
-            key="chat-history-content"
-            initial={
-              reduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, y: -4, filter: "blur(4px)" }
-            }
-            animate={
-              reduceMotion
-                ? { opacity: 1 }
-                : { opacity: 1, y: 0, filter: "blur(0px)" }
-            }
-            exit={
-              reduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, y: -4, filter: "blur(4px)" }
-            }
-            transition={
-              reduceMotion
-                ? { duration: 0 }
-                : {
-                    duration: 0.2,
-                    ease: "easeOut",
-                  }
-            }
-            className="min-h-0 flex-1 overflow-y-auto overscroll-none pt-[3px] pb-1"
-          >
-            <ChatHistoryList />
-          </m.div>
-        )}
-      </AnimatePresence>
+      <div className="relative min-h-0 flex-1">
+        <AnimatePresence initial={false}>
+          {isExpanded && (
+            <m.div
+              key="chat-history-viewport"
+              initial={
+                reduceMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, y: -4, filter: "blur(4px)" }
+              }
+              animate={
+                reduceMotion
+                  ? { opacity: 1 }
+                  : { opacity: 1, y: 0, filter: "blur(0px)" }
+              }
+              exit={
+                reduceMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, y: -4, filter: "blur(4px)" }
+              }
+              transition={
+                reduceMotion
+                  ? { duration: 0 }
+                  : {
+                      duration: 0.2,
+                      ease: "easeOut",
+                    }
+              }
+              className="absolute inset-0"
+            >
+              <div className="h-full min-h-0 overflow-y-auto overscroll-none pt-[3px] pb-1">
+                <ChatHistoryList />
+              </div>
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-0 z-10 h-5"
+                style={{
+                  background:
+                    "linear-gradient(to bottom, var(--color-sidebar-bg), rgba(245, 245, 246, 0))",
+                }}
+              />
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-5"
+                style={{
+                  background:
+                    "linear-gradient(to top, var(--color-sidebar-bg), rgba(245, 245, 246, 0))",
+                }}
+              />
+            </m.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

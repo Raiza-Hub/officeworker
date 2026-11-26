@@ -10,15 +10,6 @@ type ChatHistoryActionsPopoverProps = {
   onDelete: () => void;
 };
 
-const menuItemClassName =
-  "group/action relative isolate flex h-8 w-full items-center gap-2 rounded-none border-0 px-4.5 pl-3.5 text-left text-[13px] leading-normal font-[450] text-[lch(20_1_282)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
-
-const menuItemHoverBackgroundClassName =
-  "pointer-events-none absolute inset-y-0 right-1.5 left-1.5 -z-10 rounded-lg bg-transparent transition-colors group-hover/action:bg-[lch(94.6%_0_282)] group-focus-within/action:bg-[lch(94.6%_0_282)]";
-
-const renameItemHoverBackgroundClassName =
-  "pointer-events-none absolute inset-y-0 right-1.5 left-1.5 -z-10 rounded-lg bg-transparent transition-colors group-hover/action:bg-[lch(94.6%_0_282)]";
-
 export function ChatHistoryActionsPopover({
   title,
   onRename,
@@ -60,25 +51,25 @@ export function ChatHistoryActionsPopover({
         <div aria-hidden="true" className="h-1.5 w-full" />
         <button
           type="button"
-          className={menuItemClassName}
+          className="group/action relative isolate flex h-8 w-full items-center gap-2 rounded-none border-0 px-4.5 pl-3.5 text-left text-[13px] leading-normal font-[450] text-[lch(20_1_282)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           onClick={() => {
             setOpen(false);
             onRename();
           }}
         >
-          <span aria-hidden="true" className={renameItemHoverBackgroundClassName} />
+          <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-1.5 left-1.5 -z-10 rounded-lg bg-transparent transition-colors group-hover/action:bg-[lch(94.6%_0_282)]" />
           <Pencil aria-hidden="true" className="size-3.5 shrink-0 text-[lch(20_1_282)]" strokeWidth={2.25} />
           <span>Rename</span>
         </button>
         <button
           type="button"
-          className={menuItemClassName}
+          className="group/action relative isolate flex h-8 w-full items-center gap-2 rounded-none border-0 px-4.5 pl-3.5 text-left text-[13px] leading-normal font-[450] text-[lch(20_1_282)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           onClick={() => {
             setOpen(false);
             onDelete();
           }}
         >
-          <span aria-hidden="true" className={menuItemHoverBackgroundClassName} />
+          <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-1.5 left-1.5 -z-10 rounded-lg bg-transparent transition-colors group-hover/action:bg-[lch(94.6%_0_282)] group-focus-within/action:bg-[lch(94.6%_0_282)]" />
           <Trash2 aria-hidden="true" className="size-3.5 shrink-0 text-[lch(20_1_282)]" strokeWidth={2.25} />
           <span>Delete</span>
         </button>

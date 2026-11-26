@@ -1,30 +1,23 @@
 "use client";
 
-import {
-  CircleMinus,
-  CirclePlusIcon,
-  Download,
-  Eye,
-  LayoutGrid,
-  Link2,
-  LoaderCircle,
-  Maximize,
-  Pencil,
-  Presentation,
-  Printer,
-  X,
-} from "lucide-react";
 import type { DocxViewerZoomApi } from "@/components/agent/docx-preview";
 import type { PDFViewerZoomApi } from "@/components/extend/pdf-viewer";
 import type { PptxViewerZoomApi } from "@/components/agent/pptx-preview";
 import type { PptxEditorInstance } from "@pptx-editor.dev/react";
-import { CSV_ZOOM_OPTIONS } from "@/components/extend/csv-viewer/csv-constants";
 import type { PreviewKind } from "@/lib/file-types";
+import type { EditToggleState } from "./preview-toolbar-types";
+import {
+  CsvZoomControl,
+  DocxZoomControl,
+  EditToggleButton,
+  ImageZoomControl,
+  PdfZoomControl,
+  PptxViewToggle,
+  PptxZoomControl,
+  ToolbarFileActions,
+} from "./preview-toolbar-controls";
 
-export type EditToggleState = {
-  editable: boolean;
-  toggle: () => void;
-};
+export type { EditToggleState } from "./preview-toolbar-types";
 
 type PreviewToolbarProps = {
   filename: string;
@@ -47,39 +40,6 @@ type PreviewToolbarProps = {
   onCopyLink: () => void;
   onClose: () => void;
 };
-
-const iconButtonClass =
-  "inline-flex size-7 items-center justify-center rounded-full text-text-dim-soft transition-colors hover:bg-[#f1f3f4] hover:text-[#202124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-40";
-
-const zoomGroupClass = "mr-1 flex items-center gap-0.5 border-r border-[#eeeeef] pr-2";
-
-const zoomValueClass =
-  "min-w-[2.5rem] text-center text-xs tabular-nums text-text-dim-soft";
-
-function stepCsvZoom(
-  csvZoom: number,
-  direction: 1 | -1,
-  onChange: (zoom: number) => void,
-) {
-  const index = CSV_ZOOM_OPTIONS.indexOf(
-    csvZoom as (typeof CSV_ZOOM_OPTIONS)[number],
-  );
-  const nextIndex = Math.min(
-    CSV_ZOOM_OPTIONS.length - 1,
-    Math.max(0, index + direction),
-  );
-  onChange(CSV_ZOOM_OPTIONS[nextIndex]);
-}
-
-function stepImageZoom(
-  imageZoom: number,
-  direction: 1 | -1,
-  onChange: (zoom: number) => void,
-) {
-  onChange(
-    Math.min(4, Math.max(0.25, Number((imageZoom + 0.25 * direction).toFixed(2)))),
-  );
-}
 
 export function PreviewToolbar({
   filename,
@@ -115,263 +75,49 @@ export function PreviewToolbar({
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
-        {kind === "pdf" && pdfZoomApi && !isContentLoading ? (
-          <div className={zoomGroupClass}>
-            <button
-              type="button"
-              aria-label="Zoom out"
-              title="Zoom out"
-              disabled={pdfZoomApi.canZoomOut === false}
-              onClick={() => pdfZoomApi.zoomOut?.()}
-              className={iconButtonClass}
-            >
-              <CircleMinus aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-            <span className={zoomValueClass}>
-              {Math.round(pdfZoomApi.zoom * 100)}%
-            </span>
-            <button
-              type="button"
-              aria-label="Zoom in"
-              title="Zoom in"
-              disabled={pdfZoomApi.canZoomIn === false}
-              onClick={() => pdfZoomApi.zoomIn?.()}
-              className={iconButtonClass}
-            >
-              <CirclePlusIcon aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-            <button
-              type="button"
-              aria-label="Fit page"
-              title="Fit page"
-              onClick={() => pdfZoomApi.fit?.()}
-              className={iconButtonClass}
-            >
-              <Maximize aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-          </div>
-        ) : null}
-        {kind === "pptx" &&
-        pptxZoomApi &&
-        !isContentLoading &&
-        pptxView !== "slideSorter" ? (
-          <div className={zoomGroupClass}>
-            <button
-              type="button"
-              aria-label="Zoom out"
-              title="Zoom out"
-              disabled={!pptxZoomApi.canZoomOut}
-              onClick={() => pptxZoomApi.zoomOut()}
-              className={iconButtonClass}
-            >
-              <CircleMinus aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-            <span className={zoomValueClass}>
-              {Math.round(pptxZoomApi.zoom * 100)}%
-            </span>
-            <button
-              type="button"
-              aria-label="Zoom in"
-              title="Zoom in"
-              disabled={!pptxZoomApi.canZoomIn}
-              onClick={() => pptxZoomApi.zoomIn()}
-              className={iconButtonClass}
-            >
-              <CirclePlusIcon aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-            <button
-              type="button"
-              aria-label="Fit slide"
-              title="Fit slide"
-              onClick={() => pptxZoomApi.fit()}
-              className={iconButtonClass}
-            >
-              <Maximize aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-          </div>
-        ) : null}
-        {kind === "docx" && docxZoomApi && !isContentLoading ? (
-          <div className={zoomGroupClass}>
-            <button
-              type="button"
-              aria-label="Zoom out"
-              title="Zoom out"
-              disabled={!docxZoomApi.canZoomOut}
-              onClick={() => docxZoomApi.zoomOut()}
-              className={iconButtonClass}
-            >
-              <CircleMinus aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-            <span className={zoomValueClass}>
-              {Math.round(docxZoomApi.zoom * 100)}%
-            </span>
-            <button
-              type="button"
-              aria-label="Zoom in"
-              title="Zoom in"
-              disabled={!docxZoomApi.canZoomIn}
-              onClick={() => docxZoomApi.zoomIn()}
-              className={iconButtonClass}
-            >
-              <CirclePlusIcon aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-            <button
-              type="button"
-              aria-label="Fit page width"
-              title="Fit page width"
-              onClick={() => docxZoomApi.auto()}
-              className={iconButtonClass}
-            >
-              <Maximize aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-          </div>
-        ) : null}
-        {kind === "csv" && !isContentLoading ? (
-          <div className={zoomGroupClass}>
-            <button
-              type="button"
-              aria-label="Zoom out"
-              title="Zoom out"
-              disabled={csvZoom <= CSV_ZOOM_OPTIONS[0]}
-              onClick={() => stepCsvZoom(csvZoom, -1, onCsvZoomChange)}
-              className={iconButtonClass}
-            >
-              <CircleMinus aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-            <span className={zoomValueClass}>{Math.round(csvZoom * 100)}%</span>
-            <button
-              type="button"
-              aria-label="Zoom in"
-              title="Zoom in"
-              disabled={csvZoom >= CSV_ZOOM_OPTIONS[CSV_ZOOM_OPTIONS.length - 1]}
-              onClick={() => stepCsvZoom(csvZoom, 1, onCsvZoomChange)}
-              className={iconButtonClass}
-            >
-              <CirclePlusIcon aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-          </div>
-        ) : null}
-        {kind === "image" && !isContentLoading ? (
-          <div className={zoomGroupClass}>
-            <button
-              type="button"
-              aria-label="Zoom out"
-              title="Zoom out"
-              disabled={imageZoom <= 0.25}
-              onClick={() => stepImageZoom(imageZoom, -1, onImageZoomChange)}
-              className={iconButtonClass}
-            >
-              <CircleMinus aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-            <span className={zoomValueClass}>
-              {Math.round(imageZoom * 100)}%
-            </span>
-            <button
-              type="button"
-              aria-label="Zoom in"
-              title="Zoom in"
-              disabled={imageZoom >= 4}
-              onClick={() => stepImageZoom(imageZoom, 1, onImageZoomChange)}
-              className={iconButtonClass}
-            >
-              <CirclePlusIcon aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-            <button
-              type="button"
-              aria-label="Fit image"
-              title="Fit image"
-              disabled={imageZoom === 1}
-              onClick={() => onImageZoomChange(1)}
-              className={iconButtonClass}
-            >
-              <Maximize aria-hidden="true" className="size-3.5 shrink-0" />
-            </button>
-          </div>
-        ) : null}
-        {kind === "pptx" && pptxEditor && !isContentLoading ? (
-          <button
-            type="button"
-            aria-label="Toggle slide sorter view"
-            aria-pressed={pptxView === "slideSorter"}
-            title={pptxView === "slideSorter" ? "Normal view" : "Slide sorter"}
-            onClick={() =>
-              pptxEditor.exec({
-                type: "setPresentationView",
-                view: pptxView === "slideSorter" ? "normal" : "slideSorter",
-              })
-            }
-            className={iconButtonClass}
-          >
-            {pptxView === "slideSorter" ? (
-              <LayoutGrid aria-hidden="true" className="size-3.5 shrink-0" />
-            ) : (
-              <Presentation aria-hidden="true" className="size-3.5 shrink-0" />
-            )}
-          </button>
-        ) : null}
-        {editToggle ? (
-          <button
-            type="button"
-            aria-label={
-              editToggle.editable ? "Switch to view mode" : "Switch to edit mode"
-            }
-            title={editToggle.editable ? "View" : "Edit"}
-            onClick={editToggle.toggle}
-            className={iconButtonClass}
-          >
-            {editToggle.editable ? (
-              <Eye className="size-3.5" />
-            ) : (
-              <Pencil className="size-3.5" />
-            )}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          aria-label="Download file"
-          title="Download"
-          disabled={!canDownload || isDownloading}
-          onClick={onDownload}
-          className={iconButtonClass}
-        >
-          {isDownloading ? (
-            <LoaderCircle
-              aria-hidden="true"
-              className="size-3.5 shrink-0 animate-spin"
-            />
-          ) : (
-            <Download aria-hidden="true" className="size-3.5 shrink-0" />
-          )}
-        </button>
-        <button
-          type="button"
-          aria-label="Copy file link"
-          title="Copy link"
-          disabled={!previewUrl}
-          onClick={onCopyLink}
-          className={iconButtonClass}
-        >
-          <Link2 aria-hidden="true" className="size-3.5 shrink-0" />
-        </button>
-        <button
-          type="button"
-          aria-label="Print file"
-          title="Print"
-          disabled={!previewUrl}
-          onClick={() => window.print()}
-          className={iconButtonClass}
-        >
-          <Printer aria-hidden="true" className="size-3.5 shrink-0" />
-        </button>
-        <button
-          type="button"
-          aria-label="Close preview"
-          title="Close preview"
-          onClick={onClose}
-          className={iconButtonClass}
-        >
-          <X aria-hidden="true" className="size-3.5 shrink-0" />
-        </button>
+        <PdfZoomControl
+          kind={kind}
+          isContentLoading={isContentLoading}
+          pdfZoomApi={pdfZoomApi}
+        />
+        <PptxZoomControl
+          kind={kind}
+          isContentLoading={isContentLoading}
+          pptxView={pptxView}
+          pptxZoomApi={pptxZoomApi}
+        />
+        <DocxZoomControl
+          kind={kind}
+          isContentLoading={isContentLoading}
+          docxZoomApi={docxZoomApi}
+        />
+        <CsvZoomControl
+          kind={kind}
+          isContentLoading={isContentLoading}
+          csvZoom={csvZoom}
+          onCsvZoomChange={onCsvZoomChange}
+        />
+        <ImageZoomControl
+          kind={kind}
+          isContentLoading={isContentLoading}
+          imageZoom={imageZoom}
+          onImageZoomChange={onImageZoomChange}
+        />
+        <PptxViewToggle
+          kind={kind}
+          isContentLoading={isContentLoading}
+          pptxView={pptxView}
+          pptxEditor={pptxEditor}
+        />
+        <EditToggleButton editToggle={editToggle} />
+        <ToolbarFileActions
+          isDownloading={isDownloading}
+          previewUrl={previewUrl}
+          canDownload={canDownload}
+          onDownload={onDownload}
+          onCopyLink={onCopyLink}
+          onClose={onClose}
+        />
       </div>
     </header>
   );

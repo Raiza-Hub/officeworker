@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { FileThumbnail } from "@/components/extend/file-thumbnail";
+import { loadPreviewText } from "../preview-file-loader";
 import type { AttachmentThumbnailPreviewProps } from "./types";
 
 export function CsvAttachmentThumbnail({
@@ -15,14 +16,10 @@ export function CsvAttachmentThumbnail({
 
   useEffect(() => {
     if (!fileUrl) return;
-    let current = true;
-    void fetch(fileUrl)
-      .then((response) => {
-        if (!response.ok) throw new Error("Could not load this spreadsheet");
-        return response.text();
-      })
+    const controller = new AbortController();
+    void loadPreviewText(fileUrl, controller.signal)
       .then((text) => {
-        if (!current) return;
+        if (controller.signal.aborted) return;
         const result = Papa.parse<string[]>(text, {
           preview: 5,
           skipEmptyLines: true,
@@ -30,10 +27,10 @@ export function CsvAttachmentThumbnail({
         setCells(result.data.slice(0, 5).map((row) => row.slice(0, 4)));
       })
       .catch(() => {
-        if (current) setHasError(true);
+        if (!controller.signal.aborted) setHasError(true);
       });
     return () => {
-      current = false;
+      controller.abort();
     };
   }, [fileUrl]);
 

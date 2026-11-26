@@ -5,6 +5,10 @@ import { SidebarNavContent } from "@/components/sidebar/sidebar-nav-content";
 import { useSidebar } from "@/components/sidebar/sidebar-context";
 import { useLockBodyScroll } from "@/components/sidebar/use-lock-body-scroll";
 import { useMobileSidebarFocus } from "@/components/sidebar/use-mobile-sidebar-focus";
+import {
+  overlayClassName,
+  sidebarClassName,
+} from "./dashboard-sidebar-utils";
 
 export function DashboardSidebar() {
   const { isMobile, openMobile, setOpenMobile, openDesktop } = useSidebar();
@@ -52,11 +56,7 @@ export function DashboardSidebar() {
     <>
       <div
         aria-hidden="true"
-        className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ${ease} motion-reduce:transition-none ${
-          mobileOpen
-            ? "pointer-events-auto opacity-100"
-            : "pointer-events-none opacity-0"
-        }`}
+        className={overlayClassName(mobileOpen, ease)}
         onClick={() => {
           if (isMobile && openMobile) setOpenMobile(false);
         }}
@@ -69,17 +69,12 @@ export function DashboardSidebar() {
         aria-modal={isMobile && openMobile ? true : undefined}
         role={isMobile && openMobile ? "dialog" : undefined}
         tabIndex={-1}
-        className={
-          isMobile
-            ? `fixed inset-y-0 left-0 z-50 h-full w-61 shrink-0 overflow-hidden bg-sidebar-bg transition-transform duration-300 ${ease} motion-reduce:transition-none ${
-                renderMobileOpen
-                  ? "pointer-events-auto translate-x-0 shadow-xl"
-                  : "pointer-events-none -translate-x-full"
-              }`
-            : `hidden h-full shrink-0 overflow-hidden bg-sidebar-bg transition-[width] duration-300 ${ease} motion-reduce:transition-none md:block ${
-                renderDesktopOpen ? "w-61" : "w-0"
-              }`
-        }
+        className={sidebarClassName({
+          isMobile,
+          renderMobileOpen,
+          renderDesktopOpen,
+          ease,
+        })}
       >
         <SidebarNavContent />
       </aside>

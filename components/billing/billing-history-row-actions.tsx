@@ -12,12 +12,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-const menuItemClassName =
-  "group/action relative isolate flex h-8 w-full items-center gap-2 rounded-none border-0 px-4.5 pl-3.5 text-left text-[13px] leading-normal font-[450] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60";
-
-const menuItemHoverBackgroundClassName =
-  "pointer-events-none absolute inset-y-0 right-1.5 left-1.5 -z-10 rounded-lg bg-transparent transition-colors group-hover/action:bg-surface-hover";
-
 export function BillingHistoryRowActions({
   intentId,
   reference,
@@ -81,12 +75,12 @@ export function BillingHistoryRowActions({
       >
         <div aria-hidden="true" className="h-1.5 w-full" />
         <button
-          className={menuItemClassName}
+          className="group/action relative isolate flex h-8 w-full items-center gap-2 rounded-none border-0 px-4.5 pl-3.5 text-left text-[13px] leading-normal font-[450] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isSubmitting}
           onClick={() => void handleReport()}
           type="button"
         >
-          <span aria-hidden="true" className={menuItemHoverBackgroundClassName} />
+          <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-1.5 left-1.5 -z-10 rounded-lg bg-transparent transition-colors group-hover/action:bg-surface-hover" />
           <Flag
             aria-hidden="true"
             className="size-3.5 shrink-0 text-foreground"

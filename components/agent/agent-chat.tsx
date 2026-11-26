@@ -1,274 +1,189 @@
 "use client";
 
-import { optimisticallySendMessage } from "@convex-dev/agent/react";
-import { useMutation } from "convex/react";
-import { ConvexError } from "convex/values";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
-import { api } from "@/convex/_generated/api";
+import { useMemo } from "react";
+import { AgentChatConversation } from "@/components/agent/agent-chat-conversation";
+import { AgentChatEmptyState } from "@/components/agent/agent-chat-empty-state";
 import { AgentChatHeader } from "@/components/agent/agent-chat-header";
+import { AgentChatNotices } from "@/components/agent/agent-chat-notices";
+import { createAgentChatSendActions } from "@/components/agent/agent-chat-send-actions";
 import { AgentComposer } from "@/components/agent/agent-composer";
-import { AgentThread } from "@/components/agent/agent-thread";
-import {
-  BillingNotice,
-  billingNoticeForError,
-  type BillingNoticeData,
-} from "@/components/agent/billing-notice";
 import { ComposerPrefillContext } from "@/components/agent/composer-context";
-import {
-  OptimisticFirstMessageView,
-  type OptimisticFirstMessage,
-} from "@/components/agent/optimistic-first-message";
+import { EditMessageContext } from "@/store/edit-message";
 import { PreviewModal } from "@/components/agent/preview-modal";
 import {
   MessagesStatusContext,
   ThreadTitleContext,
-} from "@/components/agent/thread-contexts";
-import { type PreviewAttachment } from "@/components/agent/thread-message-parts";
-import { type ChatAttachment } from "@/lib/attachments";
-import { useChatStore, useEnsureDraft } from "@/lib/chat-store";
-
-function messageFromError(error: unknown, fallback: string) {
-  if (
-    error instanceof ConvexError &&
-    typeof (error.data as { message?: unknown })?.message === "string"
-  ) {
-    return (error.data as { message: string }).message;
-  }
-  return error instanceof Error ? error.message : fallback;
-}
-
-function createOptimisticTempId() {
-  const uuid =
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `optimistic-${uuid}`;
-}
+} from "@/store/thread";
+import { useAgentChatContextValues } from "@/hooks/use-agent-chat-context-values";
+import { useAgentChatCore } from "@/hooks/use-agent-chat-core";
+import { useAgentChatDraftSync } from "@/hooks/use-agent-chat-draft-sync";
+import { useAgentChatEditActions } from "@/hooks/use-agent-chat-edit-actions";
+import {
+  findActiveTurn,
+  getMessagesStatus,
+  getResultsByOrder,
+  getThreadTitle,
+  getUserOrders,
+  useThreadQueries,
+  useThreadResults,
+  useThreadScope,
+  useTurnTimingMap,
+  useVisibleResults,
+} from "@/hooks/use-agent-thread-state";
 
 export function AgentChat({ threadId: threadIdProp }: { threadId?: string }) {
-  const isNewChat = threadIdProp === undefined;
-  const [prompt, setPrompt] = useState("");
-  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [notice, setNotice] = useState<BillingNoticeData | null>(null);
-  const [messagesStatus, setMessagesStatus] = useState(
-    isNewChat ? "Ready" : "LoadingFirstPage",
+  const core = useAgentChatCore(threadIdProp);
+  useAgentChatDraftSync({
+    isNewChat: core.isNewChat,
+    ensureDraft: core.ensureDraft,
+  });
+  const hasThread = Boolean(core.effectiveThreadId);
+  const { cacheScope, summary } = useThreadScope(core.effectiveThreadId);
+  const { cachedThread, turnTimings, messages } = useThreadQueries(
+    core.effectiveThreadId,
+    cacheScope,
   );
-  const [activeTurn, setActiveTurn] = useState<{
-    promptMessageId: string;
-    order: number;
-  } | null>(null);
-  const [isStopping, setIsStopping] = useState(false);
-  const [preloadedTitle, setPreloadedTitle] = useState<string | null | undefined>(
-    isNewChat ? null : undefined,
+  const { realResults, results } = useThreadResults(
+    cachedThread,
+    messages,
+    core.optimisticFirstMessage,
   );
-  const [clientThreadId, setClientThreadId] = useState<string | null>(null);
-  const [showConversation, setShowConversation] = useState(!isNewChat);
-  const [optimisticFirstMessage, setOptimisticFirstMessage] =
-    useState<OptimisticFirstMessage | null>(null);
-  const [previewAttachment, setPreviewAttachment] = useState<PreviewAttachment | null>(null);
-
-  const sendMessage = useMutation(api.chat.sendMessage).withOptimisticUpdate(
-    (store, args) =>
-      optimisticallySendMessage(api.chat.listThreadMessages)(store, args),
+  const visibleResults = useVisibleResults(results, core.editing);
+  const timingByPromptId = useTurnTimingMap(turnTimings);
+  const resultsByOrder = useMemo(
+    () => getResultsByOrder(visibleResults),
+    [visibleResults],
   );
-  const cancelGeneration = useMutation(api.chat.cancelGeneration);
-  const ensureDraft = useEnsureDraft();
-  const clearDraft = useChatStore((state) => state.clearDraft);
-  const newChatToken = useChatStore((state) => state.newChatToken);
+  const userOrders = useMemo(() => getUserOrders(results), [results]);
+  const activeTurn = findActiveTurn(visibleResults, timingByPromptId);
+  const preloadedTitle = getThreadTitle(summary, hasThread);
+  const messagesStatus = getMessagesStatus(messages, cachedThread, hasThread);
+  const { handleOptimisticResolved, reportError, startEdit, cancelEdit } =
+    useAgentChatEditActions({
+      setOptimisticFirstMessage: core.setOptimisticFirstMessage,
+      setNotice: core.setNotice,
+      editing: core.editing,
+      setEditing: core.setEditing,
+      prompt: core.prompt,
+      setPrompt: core.setPrompt,
+      attachments: core.attachments,
+      setAttachments: core.setAttachments,
+      activeTurn: activeTurn,
+    });
+  const { handleStop, handleSubmit } = createAgentChatSendActions({
+    activeTurn: activeTurn,
+    effectiveThreadId: core.effectiveThreadId,
+    isStopping: core.isStopping,
+    setIsStopping: core.setIsStopping,
+    cancelGeneration: core.cancelGeneration,
+    prompt: core.prompt,
+    attachments: core.attachments,
+    editing: core.editing,
+    isNewChat: core.isNewChat,
+    ensureDraft: core.ensureDraft,
+    sendMessage: core.sendMessage,
+    editMessage: core.editMessage,
+    clearDraft: core.clearDraft,
+    newChatToken: core.newChatToken,
+    setNotice: core.setNotice,
+    setEditing: core.setEditing,
+    setPrompt: core.setPrompt,
+    setAttachments: core.setAttachments,
+    setOptimisticFirstMessage: core.setOptimisticFirstMessage,
+    setShowConversation: core.setShowConversation,
+    setClientThreadId: core.setClientThreadId,
+    setIsSubmitting: core.setIsSubmitting,
+    reportError,
+  });
+  const {
+    titleContextValue,
+    messagesStatusContextValue,
+    composerPrefillContextValue,
+    editMessageContextValue,
+  } = useAgentChatContextValues({
+    preloadedTitle,
+    messagesStatus,
+    activeTurn,
+    editing: core.editing,
 
-  const effectiveThreadId = threadIdProp ?? clientThreadId;
+    startEdit,
+    cancelEdit,
+    setPrompt: core.setPrompt,
+  });
 
-  useEffect(() => {
-    if (!isNewChat) return;
-    void ensureDraft().catch(() => {});
-  }, [ensureDraft, isNewChat]);
-
-  const handleOptimisticResolved = useCallback(() => {
-    setOptimisticFirstMessage(null);
-  }, []);
-
-  async function handleStop() {
-    if (!activeTurn || !effectiveThreadId || isStopping) return;
-    setIsStopping(true);
-    try {
-      await cancelGeneration({ threadId: effectiveThreadId, ...activeTurn });
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not stop generation",
-      );
-    } finally {
-      setIsStopping(false);
-    }
-  }
-
-  async function handleSubmit() {
-    const trimmed = prompt.trim();
-    if (!trimmed && attachments.length === 0) return;
-    const submittedAttachments = attachments;
-    const shouldShowOptimisticFirstMessage = isNewChat && !effectiveThreadId;
-    const tempId = shouldShowOptimisticFirstMessage
-      ? createOptimisticTempId()
-      : null;
-    setIsSubmitting(true);
-    setNotice(null);
-
-    if (shouldShowOptimisticFirstMessage && tempId) {
-      setOptimisticFirstMessage({
-        tempId,
-        prompt: trimmed,
-        attachments: submittedAttachments,
-        createdAt: Date.now(),
-      });
-      setShowConversation(true);
-      setPrompt("");
-      setAttachments([]);
-    }
-
-    try {
-      const threadId = effectiveThreadId ?? (await ensureDraft());
-      const { messageId } = await sendMessage({
-        threadId,
-        prompt: trimmed,
-        attachments:
-          submittedAttachments.length > 0 ? submittedAttachments : undefined,
-      });
-
-      if (shouldShowOptimisticFirstMessage && tempId) {
-        setOptimisticFirstMessage((current) =>
-          current?.tempId === tempId ? { ...current, messageId } : current,
-        );
-        setClientThreadId(threadId);
-        clearDraft(newChatToken);
-        if (
-          typeof window !== "undefined" &&
-          window.location.pathname !== `/agent/${threadId}`
-        ) {
-          window.history.replaceState(null, "", `/agent/${threadId}`);
-        }
-      }
-
-      setPrompt("");
-      setAttachments([]);
-    } catch (error) {
-      if (shouldShowOptimisticFirstMessage) {
-        setOptimisticFirstMessage(null);
-        setShowConversation(false);
-        setPrompt(trimmed);
-        setAttachments(submittedAttachments);
-        if (error instanceof Error && error.message === "Thread not found") {
-          clearDraft();
-        }
-      }
-      const billing = error instanceof ConvexError ? billingNoticeForError(error.data) : null;
-      if (billing) {
-        setNotice(billing);
-      } else {
-        toast.error(
-          messageFromError(
-            error,
-            isNewChat ? "Failed to start conversation" : "Failed to send message",
-          ),
-        );
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  const titleContextValue = useMemo(
-    () => ({ title: preloadedTitle, setTitle: setPreloadedTitle }),
-    [preloadedTitle],
+  const noticeNode = (
+    <AgentChatNotices
+      editing={core.editing}
+      notice={core.notice}
+      onCancelEdit={cancelEdit}
+      onDismissNotice={() => core.setNotice(null)}
+    />
   );
-  const messagesStatusContextValue = useMemo(
-    () => ({
-      status: messagesStatus,
-      setStatus: setMessagesStatus,
-      activeTurn,
-      setActiveTurn,
-    }),
-    [messagesStatus, activeTurn],
-  );
-  const composerPrefillContextValue = useMemo(
-    () => ({ prefill: setPrompt }),
-    [],
-  );
-
-  const noticeNode = notice ? <BillingNotice notice={notice} /> : null;
   const composer = (
     <AgentComposer
-      value={prompt}
+      value={core.prompt}
       onChange={(value) => {
-        setPrompt(value);
-        if (notice) setNotice(null);
+        core.setPrompt(value);
+        if (core.notice) core.setNotice(null);
       }}
       onSubmit={handleSubmit}
-      isSubmitting={isSubmitting}
+      isSubmitting={core.isSubmitting}
       isGenerating={activeTurn !== null}
-      isStopping={isStopping}
+      isStopping={core.isStopping}
       onStop={() => void handleStop()}
-      loading={messagesStatus === "LoadingFirstPage" && !optimisticFirstMessage}
-      attachments={attachments}
-      onAttachmentsChange={setAttachments}
+      loading={
+        messagesStatus === "LoadingFirstPage" &&
+        !core.optimisticFirstMessage
+      }
+      attachments={core.attachments}
+      onAttachmentsChange={core.setAttachments}
     />
   );
 
   const hasConversation =
-    Boolean(effectiveThreadId) || Boolean(optimisticFirstMessage && showConversation);
+    Boolean(core.effectiveThreadId) ||
+    Boolean(core.optimisticFirstMessage && core.showConversation);
 
   return (
     <ThreadTitleContext.Provider value={titleContextValue}>
       <MessagesStatusContext.Provider value={messagesStatusContextValue}>
         <ComposerPrefillContext.Provider value={composerPrefillContextValue}>
-          <div className="flex h-full min-h-0 flex-col bg-agent-page-bg text-ink">
-            <AgentChatHeader
-              title={preloadedTitle ?? "New chat"}
-              titleLoading={!isNewChat && preloadedTitle === undefined}
-              showDropdown={false}
-            />
-            {hasConversation ? (
-              <>
-                <div className="flex min-h-0 flex-1 flex-col">
-                  {effectiveThreadId ? (
-                    <AgentThread
-                      threadId={effectiveThreadId}
-                      optimisticFirstMessage={optimisticFirstMessage}
-                      onOptimisticResolved={handleOptimisticResolved}
-                      onPreview={setPreviewAttachment}
-                    />
-                  ) : optimisticFirstMessage ? (
-                    <OptimisticFirstMessageView
-                      message={optimisticFirstMessage}
-                      onPreview={setPreviewAttachment}
-                    />
-                  ) : null}
-                </div>
-                <div className="shrink-0 px-6 pb-5">
-                  <div className="mx-auto w-full max-w-178">
-                    {noticeNode}
-                    {composer}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="flex min-h-0 flex-1 justify-center overflow-auto p-6">
-                <div className="relative z-10 my-auto w-full max-w-178">
-                  <h1 className="mb-8 text-center text-3xl leading-none font-normal tracking-[-0.01em] text-ink">
-                    What do you need help with today?
-                  </h1>
-                  {noticeNode}
-                  {composer}
-                </div>
-              </div>
-            )}
-            <PreviewModal
-              storageKey={previewAttachment?.key ?? null}
-              filename={previewAttachment?.name ?? ""}
-              mediaType={previewAttachment?.mediaType}
-              onClose={() => setPreviewAttachment(null)}
-            />
-          </div>
+          <EditMessageContext.Provider value={editMessageContextValue}>
+            <div className="flex h-full min-h-0 flex-col bg-agent-page-bg text-ink">
+              <AgentChatHeader
+                title={preloadedTitle ?? "New chat"}
+                titleLoading={
+                  !core.isNewChat && preloadedTitle === undefined
+                }
+                showDropdown={false}
+              />
+              {hasConversation ? (
+                <AgentChatConversation
+                  effectiveThreadId={core.effectiveThreadId}
+                  optimisticFirstMessage={core.optimisticFirstMessage}
+                  cachedThread={cachedThread}
+                  messages={messages}
+                  realResults={realResults}
+                  visibleResults={visibleResults}
+                  timingByPromptId={timingByPromptId}
+                  resultsByOrder={resultsByOrder}
+                  userOrders={userOrders}
+                  onOptimisticResolved={handleOptimisticResolved}
+                  onPreview={core.setPreviewAttachment}
+                  notice={noticeNode}
+                  composer={composer}
+                />
+              ) : (
+                <AgentChatEmptyState notice={noticeNode} composer={composer} />
+              )}
+              <PreviewModal
+                storageKey={core.previewAttachment?.key ?? null}
+                filename={core.previewAttachment?.name ?? ""}
+                mediaType={core.previewAttachment?.mediaType}
+                onClose={() => core.setPreviewAttachment(null)}
+              />
+            </div>
+          </EditMessageContext.Provider>
         </ComposerPrefillContext.Provider>
       </MessagesStatusContext.Provider>
     </ThreadTitleContext.Provider>

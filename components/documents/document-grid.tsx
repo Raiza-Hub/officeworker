@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RotateCcw, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import { useStableDocumentSearch, DOCUMENTS_PAGE_SIZE } from "@/components/documents/use-stable-paginated-query";
+import { showPreviewUnsupportedToast } from "@/lib/preview-errors";
+import { useStableDocumentSearch, DOCUMENTS_PAGE_SIZE } from "@/hooks/use-stable-paginated-query";
 import { DocumentEmptyState } from "@/components/documents/document-empty-state";
 import { DocumentGridSkeleton } from "@/components/documents/document-grid-skeleton";
 import { AttachmentThumbnail } from "@/components/agent/attachment-thumbnail";
@@ -12,7 +12,7 @@ import { isPreviewSupported } from "@/lib/file-types";
 import {
   useDocumentUploads,
   type DocumentUploadItem,
-} from "@/components/documents/document-uploads-context";
+} from "@/store/document-uploads";
 import {
   activeDocumentFilterCount,
   defaultDocumentFilters,
@@ -136,11 +136,7 @@ function DocumentTile({
                 type: doc.type,
               })
           : () =>
-              toast.error("Preview unavailable", {
-                id: `preview-unsupported-${doc.storageKey}`,
-                description:
-                  "This file format can't be displayed in the browser. Download it to view the contents.",
-              })
+              showPreviewUnsupportedToast(doc.storageKey)
       }
     />
   );
@@ -181,11 +177,16 @@ export function DocumentGrid({
     }
     return map;
   }, [items]);
+  const trackerByKeyRef = useRef(trackerByKey);
+
+  useEffect(() => {
+    trackerByKeyRef.current = trackerByKey;
+  }, [trackerByKey]);
 
   useEffect(() => {
     for (const doc of results) {
       if (doc.status !== "Uploading") continue;
-      if (trackerByKey.has(doc.storageKey)) continue;
+      if (trackerByKeyRef.current.has(doc.storageKey)) continue;
       resumeStaleUpload({
         _id: doc._id,
         storageKey: doc.storageKey,
@@ -194,7 +195,7 @@ export function DocumentGrid({
         size: doc.size,
       });
     }
-  }, [results, resumeStaleUpload, trackerByKey]);
+  }, [results, resumeStaleUpload]);
 
   const rowKeys = useMemo(
     () => new Set(results.map((doc) => doc.storageKey)),

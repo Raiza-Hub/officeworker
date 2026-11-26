@@ -2,6 +2,16 @@ import { isToolPart, partText, type UIMessagePartList } from "@/components/agent
 
 export type ThreadEntry = { key: string; kind: "text"; text: string };
 
+export function visibleThreadResults<
+  T extends { order?: number; stepOrder?: number },
+>(results: T[], editing: { order: number } | null): T[] {
+  if (!editing) return results;
+  return results.filter((message) => {
+    if (typeof message.order !== "number") return true;
+    return message.order < editing.order;
+  });
+}
+
 export function historyMessageKey(message: {
   id: string;
   role?: string;
@@ -22,6 +32,14 @@ export function finalAssistantParts(parts: UIMessagePartList): UIMessagePartList
     -1,
   );
   return lastToolIndex < 0 ? parts : parts.slice(lastToolIndex + 1);
+}
+
+export function assistantPlainText(parts: UIMessagePartList): string {
+  return finalAssistantParts(parts)
+    .map(partText)
+    .join("")
+    .replace(/\[submission:[^\]]*\]?/g, "")
+    .trim();
 }
 
 export function buildEntries(parts: UIMessagePartList): ThreadEntry[] {
