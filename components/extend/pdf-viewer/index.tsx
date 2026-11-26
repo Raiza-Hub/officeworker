@@ -188,14 +188,10 @@ const THUMBNAIL_WIDTH = THUMBNAIL_PAGE_WIDTH + THUMBNAIL_IMAGE_PADDING * 2
 const THUMBNAIL_LABEL_HEIGHT = 24
 const THUMBNAIL_GAP = 12
 const THUMBNAIL_PANE_PADDING_Y = 16
-const THUMBNAIL_SIDEBAR_WIDTH_CLASS = "w-40"
-const THUMBNAIL_SIDEBAR_CLOSED_CLASS = "-ml-40"
 const PAGE_BASE_RENDER_MAX_SCALE = 1
 const PAGE_BASE_RENDER_DPR = 1
 const PDF_SEARCH_DEBOUNCE_MS = 300
 const TEXT_SELECTION_BACKGROUND = "rgba(59, 130, 246, 0.14)"
-const THUMBNAIL_FOCUS_RING_CLASS =
-  "group-focus-visible/pdf-thumbnail-sidebar:ring-2 group-focus-visible/pdf-thumbnail-sidebar:ring-ring group-focus-visible/pdf-thumbnail-sidebar:ring-offset-1 group-focus-visible/pdf-thumbnail-sidebar:ring-offset-background"
 const DEFAULT_SCROLL_AREA_VIEWPORT_SELECTOR =
   '[data-slot="scroll-area-viewport"]'
 const ZOOM_MODE_LABELS: Record<ZoomMode, string> = {
@@ -455,7 +451,7 @@ function PDFViewerLoadingSkeleton({
     <div className="absolute inset-0 z-20 flex">
       {sidebarOpen ? (
         <DocumentViewerSidebarSkeleton
-          className={THUMBNAIL_SIDEBAR_WIDTH_CLASS}
+          className="w-40"
           inline={sidebarInline}
         />
       ) : null}
@@ -1334,7 +1330,8 @@ function PDFViewerThumbnails({
                 isActive || isSelected
                   ? "bg-sidebar-accent text-foreground"
                   : "text-muted-foreground",
-                isActive && THUMBNAIL_FOCUS_RING_CLASS
+                isActive &&
+                  "group-focus-visible/pdf-thumbnail-sidebar:ring-2 group-focus-visible/pdf-thumbnail-sidebar:ring-ring group-focus-visible/pdf-thumbnail-sidebar:ring-offset-1 group-focus-visible/pdf-thumbnail-sidebar:ring-offset-background"
               )}
               onClick={(event) => {
                 const mode = event.shiftKey
@@ -2481,10 +2478,10 @@ function PDFViewerInner({
         ) : null}
         <div className="flex h-full max-h-full min-h-0 w-full flex-1 overflow-hidden">
           <DocumentViewerThumbnailSidebar
-            closedInlineClassName={THUMBNAIL_SIDEBAR_CLOSED_CLASS}
+            closedInlineClassName="-ml-40"
             inline={sidebarInline}
             open={thumbnailSidebarVisible}
-            widthClassName={THUMBNAIL_SIDEBAR_WIDTH_CLASS}
+            widthClassName="w-40"
           >
             {thumbnailSidebarVisible ? (
               <PDFViewerThumbnails
