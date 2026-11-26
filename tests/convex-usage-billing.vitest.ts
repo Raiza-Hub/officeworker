@@ -288,6 +288,44 @@ describe("usage billing convex seams", () => {
     });
   });
 
+  test("thread candles exclude draft threads", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const now = Date.now();
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert("threadActivity", {
+        userId,
+        threadId: "draft-thread",
+        title: "",
+        status: "draft",
+        lastActivityAt: now,
+      });
+      await ctx.db.insert("threadActivity", {
+        userId,
+        threadId: "active-thread",
+        title: "Active thread",
+        status: "active",
+        lastActivityAt: now - 1_000,
+      });
+      await ctx.db.insert("threadActivity", {
+        userId,
+        threadId: "legacy-thread",
+        title: "Legacy thread",
+        lastActivityAt: now - 2_000,
+      });
+    });
+
+    const candles = await t
+      .withIdentity({ subject: userId })
+      .query(api.billing.threadBillingCandles, {});
+
+    expect(candles.map((candle) => candle.threadId)).toEqual([
+      "legacy-thread",
+      "active-thread",
+    ]);
+  });
+
   test("batch custom tool reservation dedupes keys and reserves the total", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);
