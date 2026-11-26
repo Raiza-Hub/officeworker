@@ -24,7 +24,7 @@ export function sidebarClassName({
         : "pointer-events-none -translate-x-full"
     }`;
   }
-  return `hidden h-full shrink-0 overflow-hidden bg-sidebar-bg transition-[width] duration-300 ${ease} motion-reduce:transition-none md:block ${
+  return `hidden h-full shrink-0 overflow-hidden bg-sidebar-bg transition-[width] duration-300 ${ease} motion-reduce:transition-none lg:block ${
     renderDesktopOpen ? "w-61" : "w-0"
   }`;
 }

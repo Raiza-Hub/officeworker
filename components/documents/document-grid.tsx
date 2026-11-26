@@ -222,7 +222,7 @@ export function DocumentGrid({
     <>
       {isEmpty ? (
         hasSearch ? (
-          <div className="mt-8 rounded-[9px] border border-dashed border-[#dedee3] px-6 py-6 text-xs font-medium text-text-dim">
+          <div className="mt-4 rounded-[9px] border border-dashed border-[#dedee3] px-6 py-6 text-xs font-medium text-text-dim">
             No documents match &quot;{shownTerm.trim()}&quot;
           </div>
         ) : (
@@ -231,15 +231,15 @@ export function DocumentGrid({
       ) : (
         <ul
           aria-label="Documents"
-          className="mt-8 grid list-none justify-between grid-cols-[repeat(auto-fill,10rem)] gap-x-3 gap-y-6 p-0"
+          className="mt-4 grid grid-cols-1 list-none gap-x-4 gap-y-8 p-0 [--attachment-name-color:#24252a] [--attachment-name-leading:20px] [--attachment-name-size:14px] [--attachment-name-weight:500] [--preview-aspect-ratio:0.8] pointer-fine:[--attachment-name-leading:18px] pointer-fine:[--attachment-name-size:13px] max-md:pointer-fine:grid-cols-2 md:[--attachment-name-leading:18px] md:[--attachment-name-size:13px] md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
         >
           {unmatchedTrackerItems.map((item) => (
-            <li key={item.id} className="w-40">
+            <li key={item.id} className="w-full min-w-0">
               <TrackerTile item={item} />
             </li>
           ))}
           {results.map((doc) => (
-            <li key={doc._id} className="w-40">
+            <li key={doc._id} className="w-full min-w-0">
               <DocumentTile
                 doc={doc}
                 tracker={trackerByKey.get(doc.storageKey)}

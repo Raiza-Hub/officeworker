@@ -101,7 +101,7 @@ export function FileThumbnail({
         )}
         style={
           previewAspectRatio
-            ? { aspectRatio: String(previewAspectRatio) }
+            ? { aspectRatio: `var(--preview-aspect-ratio, ${previewAspectRatio})` }
             : undefined
         }
       >
