@@ -311,7 +311,19 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_status", ["userId", "status"])
-    .index("by_thread", ["threadId"]),
+    .index("by_thread", ["threadId"])
+    .index("by_thread_user", ["threadId", "userId"]),
+
+  submissionThreadActivity: defineTable({
+    userId: v.id("users"),
+    threadId: v.string(),
+    visibleCount: v.number(),
+    awaitingCount: v.number(),
+    hasAwaitingReview: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_thread", ["userId", "threadId"])
+    .index("by_user_awaiting", ["userId", "hasAwaitingReview"]),
 
   auditLog: defineTable({
     submissionId: v.id("submissions"),

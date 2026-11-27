@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, type Dispatch, type SetStateAction } from "react";
+import { fileEditPrefixForName } from "@/lib/submission-card";
 import type {
   ActiveTurn,
   EditableMessage,
@@ -15,6 +16,8 @@ type UseAgentChatContextValuesArgs = {
   startEdit: (message: EditableMessage) => void;
   cancelEdit: () => void;
   setPrompt: Dispatch<SetStateAction<string>>;
+  setHighlightPrefix: Dispatch<SetStateAction<string | null>>;
+  focusComposer: () => void;
 };
 
 export function useAgentChatContextValues({
@@ -25,6 +28,8 @@ export function useAgentChatContextValues({
   startEdit,
   cancelEdit,
   setPrompt,
+  setHighlightPrefix,
+  focusComposer,
 }: UseAgentChatContextValuesArgs) {
   const titleContextValue = useMemo(
     () => ({ title: preloadedTitle }),
@@ -35,8 +40,22 @@ export function useAgentChatContextValues({
     [messagesStatus, activeTurn],
   );
   const composerPrefillContextValue = useMemo(
-    () => ({ prefill: setPrompt }),
-    [setPrompt],
+    () => ({
+      prefill: (
+        text: string,
+        options?: { focus?: boolean; highlight?: boolean },
+      ) => {
+        setPrompt(text);
+        setHighlightPrefix(options?.highlight ? text : null);
+        if (options?.focus) focusComposer();
+      },
+      startFileEdit: (fileName: string) => {
+        setPrompt("");
+        setHighlightPrefix(fileEditPrefixForName(fileName));
+        focusComposer();
+      },
+    }),
+    [focusComposer, setHighlightPrefix, setPrompt],
   );
   const editMessageContextValue = useMemo(
     () => ({ editing, startEdit, cancelEdit }),

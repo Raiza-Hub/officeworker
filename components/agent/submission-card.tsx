@@ -115,7 +115,7 @@ export function SubmissionCard({ submissionId }: { submissionId: string }) {
 
   const handleEdit = (file: Artifact) => {
     const message = `Edit ${file.name} (key: ${file.key}): `;
-    prefill(message);
+    prefill(message, { highlight: true });
   };
 
   const handleDownload = async (file: Artifact) => {

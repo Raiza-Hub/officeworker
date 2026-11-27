@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { LoaderCircle } from "lucide-react";
 import { m, useReducedMotion } from "motion/react";
 import { useConvexAuth } from "convex/react";
+import { useQueries } from "convex-helpers/react/cache";
 import { usePaginatedQuery } from "convex-helpers/react/cache/hooks";
 import { api } from "@/convex/_generated/api";
 import { ChatHistoryRow } from "@/components/chat-history/chat-history-row";
@@ -19,6 +20,32 @@ export function ChatHistoryList() {
     api.chat.listThreads,
     isAuthenticated ? {} : "skip",
     { initialNumItems: PAGE_SIZE },
+  );
+  const activityQueries = useMemo(
+    () =>
+      Object.fromEntries(
+        results.map((thread) => [
+          thread.threadId,
+          {
+            query: api.submissions.getThreadActivity,
+            args: { threadId: thread.threadId },
+          },
+        ]),
+      ),
+    [results],
+  );
+  const activities = useQueries(activityQueries);
+  const threadsWithAwaitingReview = useMemo(
+    () =>
+      new Set(
+        Object.entries(activities)
+          .filter(([, activity]) => {
+            if (!activity || activity instanceof Error) return false;
+            return "hasAwaitingReview" in activity && activity.hasAwaitingReview;
+          })
+          .map(([threadId]) => threadId),
+      ),
+    [activities],
   );
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -67,6 +94,7 @@ export function ChatHistoryList() {
             key={thread.threadId}
             threadId={thread.threadId}
             name={thread.title?.trim() || "New chat"}
+            hasAwaitingReview={threadsWithAwaitingReview.has(thread.threadId)}
           />
         ))}
       </ul>

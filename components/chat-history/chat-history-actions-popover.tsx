@@ -8,12 +8,14 @@ type ChatHistoryActionsPopoverProps = {
   title: string;
   onRename: () => void;
   onDelete: () => void;
+  startHiddenOnMobile?: boolean;
 };
 
 export function ChatHistoryActionsPopover({
   title,
   onRename,
   onDelete,
+  startHiddenOnMobile = false,
 }: ChatHistoryActionsPopoverProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -32,7 +34,7 @@ export function ChatHistoryActionsPopover({
       <PopoverTrigger
         ref={triggerRef}
         aria-label={`More actions for ${title}`}
-        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#656871] opacity-0 transition-[background-color,opacity] group-hover:opacity-100 hover:bg-[#f1f1f2] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 data-[popup-open]:bg-[#f1f1f2] data-[popup-open]:opacity-100"
+        className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#656871] ${startHiddenOnMobile ? "opacity-0" : "opacity-100"} transition-[background-color,opacity] md:opacity-0 group-hover:opacity-100 hover:bg-[#f1f1f2] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 data-[popup-open]:bg-[#f1f1f2] data-[popup-open]:opacity-100`}
         onClick={(e) => e.stopPropagation()}
       >
         <MoreHorizontal aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={2.25} />

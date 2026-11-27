@@ -10,9 +10,14 @@ import { SidebarLink } from "@/components/sidebar/sidebar-link";
 type ChatHistoryRowProps = {
   threadId: string;
   name: string;
+  hasAwaitingReview?: boolean;
 };
 
-export function ChatHistoryRow({ threadId, name }: ChatHistoryRowProps) {
+export function ChatHistoryRow({
+  threadId,
+  name,
+  hasAwaitingReview = false,
+}: ChatHistoryRowProps) {
   const reduceMotion = useReducedMotion();
   const rowRef = useRef<HTMLLIElement>(null);
   const {
@@ -58,13 +63,28 @@ export function ChatHistoryRow({ threadId, name }: ChatHistoryRowProps) {
             onFocus={prefetchThread}
             className="pr-9"
           >
-            <span className="min-w-0 flex-1 truncate">{name}</span>
+            <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap md:text-ellipsis max-md:[mask-image:linear-gradient(to_right,black_calc(100%_-_24px),transparent_100%)] max-md:[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_24px),transparent_100%)]">
+              {name}
+            </span>
           </SidebarLink>
+          {hasAwaitingReview ? (
+            <span
+              role="img"
+              aria-label="Awaiting review"
+              className={`pointer-events-none absolute top-1/2 right-[8.5px] -translate-y-1/2 opacity-100 transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0 ${isActive ? "max-md:hidden" : ""}`}
+            >
+              <span className="relative flex size-[7px]" aria-hidden="true">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+                <span className="relative inline-flex size-[7px] rounded-full bg-blue-500" />
+              </span>
+            </span>
+          ) : null}
           <div className="absolute top-1/2 right-1 -translate-y-1/2">
             <ChatHistoryActionsPopover
               title={name}
               onRename={startRenaming}
               onDelete={handleDelete}
+              startHiddenOnMobile={hasAwaitingReview && !isActive}
             />
           </div>
         </>

@@ -235,6 +235,7 @@ export function usePreviewUrlState({
 
 export function usePreviewActions({
   kind,
+  allowEdit,
   storageKey,
   activeFilename,
   previewUrl,
@@ -304,6 +305,7 @@ export function usePreviewActions({
 
   const editToggle: EditToggleState | null = buildEditToggle({
     kind,
+    allowEdit,
     csvSaveApi: editor.csvSaveApi,
     xlsxSaveApi: editor.xlsxSaveApi,
     isContentLoading,

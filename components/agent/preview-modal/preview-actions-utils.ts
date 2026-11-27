@@ -63,6 +63,7 @@ export function canDownloadPreview(
 
 export function buildEditToggle(input: {
   kind: PreviewKind;
+  allowEdit?: boolean;
   csvSaveApi: CsvViewerSaveApi | null;
   xlsxSaveApi: XlsxViewerSaveApi | null;
   isContentLoading: boolean;
@@ -75,6 +76,7 @@ export function buildEditToggle(input: {
   onToggleDocx: () => void;
   onTogglePptx: () => void;
 }): EditToggleState | null {
+  if (input.allowEdit === false) return null;
   switch (input.kind) {
     case "docx":
       return {
@@ -101,6 +103,7 @@ export function buildEditToggle(input: {
 
 export type PreviewActionsInput = {
   kind: PreviewKind;
+  allowEdit?: boolean;
   storageKey: string | null;
   activeFilename: string;
   previewUrl: string | null;

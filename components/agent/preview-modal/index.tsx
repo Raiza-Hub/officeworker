@@ -17,6 +17,7 @@ type PreviewModalProps = {
   storageKey: string | null;
   filename: string;
   mediaType?: string;
+  allowEdit?: boolean;
   onClose: () => void;
 };
 
@@ -24,6 +25,7 @@ export function PreviewModal({
   storageKey,
   filename,
   mediaType,
+  allowEdit,
   onClose,
 }: PreviewModalProps) {
   const open = storageKey !== null;
@@ -33,6 +35,7 @@ export function PreviewModal({
   const url = usePreviewUrlState({ storageKey, filename, mediaType, close });
   const actions = usePreviewActions({
     kind: url.kind,
+    allowEdit,
     storageKey,
     activeFilename: url.activeFilename,
     previewUrl: url.previewUrl,
@@ -93,10 +96,10 @@ export function PreviewModal({
         kind={url.kind}
         filename={url.activeFilename}
         isContentLoading={url.isContentLoading}
-        docxEditable={controls.docxEditable}
-        pptxEditable={controls.pptxEditable}
-        xlsxEditable={controls.xlsxEditable}
-        csvEditable={controls.csvEditable}
+        docxEditable={allowEdit === true && controls.docxEditable}
+        pptxEditable={allowEdit === true && controls.pptxEditable}
+        xlsxEditable={allowEdit === true && controls.xlsxEditable}
+        csvEditable={allowEdit === true && controls.csvEditable}
         csvZoom={controls.csvZoom}
         onCsvZoomChange={controls.setCsvZoom}
         imageZoom={controls.imageZoom}

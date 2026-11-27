@@ -49,16 +49,16 @@ export function AgentChatConversation({
           />
         ) : null}
       </div>
-      <div className="relative shrink-0 px-6 pb-5">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 -top-10 z-10 h-10"
-          style={{
-            background:
-              "linear-gradient(to top, var(--color-agent-page-bg) 0%, rgba(249, 249, 250, 0.75) 45%, rgba(249, 249, 250, 0) 100%)",
-          }}
-        />
-        <div className="mx-auto w-full max-w-178">
+      <div className="shrink-0 px-6 pb-5">
+        <div className="relative mx-auto w-full max-w-178">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 -top-10 z-10 h-10"
+            style={{
+              background:
+                "linear-gradient(to top, var(--color-agent-page-bg) 0%, rgba(249, 249, 250, 0.75) 45%, rgba(249, 249, 250, 0) 100%)",
+            }}
+          />
           {notice}
           {composer}
         </div>

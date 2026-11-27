@@ -6,6 +6,7 @@ export type BillingNoticeCode =
 export type BillingNoticeData = {
   code: BillingNoticeCode | "EDITING";
   message: string;
+  highlight?: string;
   actionLabel?: string;
   href?: string;
 };

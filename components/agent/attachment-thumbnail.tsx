@@ -19,6 +19,7 @@ export function AttachmentThumbnail({
   isUploading = false,
   className = "w-28",
   nameLines = 1,
+  showName = true,
   progress = null,
   footer,
   onCancel,
@@ -29,6 +30,7 @@ export function AttachmentThumbnail({
   isUploading?: boolean;
   className?: string;
   nameLines?: 1 | 2;
+  showName?: boolean;
   progress?: number | "indeterminate" | null;
   footer?: React.ReactNode;
   onCancel?: () => void;
@@ -46,6 +48,7 @@ export function AttachmentThumbnail({
         progress={progress}
         footer={footer}
         nameLines={nameLines}
+        showName={showName}
       />
       <AttachmentUploadControls
         attachment={attachment}
