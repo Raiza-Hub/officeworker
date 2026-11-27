@@ -395,12 +395,22 @@ export const startPortalJob = internalAction({
 });
 
 export const startUploadJob = internalAction({
-  args: { submissionId: v.id("submissions") },
+  args: {
+    submissionId: v.id("submissions"),
+    expectedStatus: v.optional(v.string()),
+    expectedCandidateKey: v.optional(v.string()),
+  },
   handler: async (ctx, args): Promise<{ runId: string; sessionId?: string; workspaceId?: string; profileId: string }> => {
     const submission: Doc<"submissions"> | null = await ctx.runQuery(internal.submissions.getSubmissionInternal, { submissionId: args.submissionId });
     if (!submission) throw new Error("Submission not found");
+    if (args.expectedStatus && submission.status !== args.expectedStatus) {
+      throw new Error(`Submission changed before upload: ${submission.status}`);
+    }
     const candidate = submission.files.uploadCandidate;
     if (!candidate) throw new Error("No upload candidate is set for this submission");
+    if (args.expectedCandidateKey && candidate.key !== args.expectedCandidateKey) {
+      throw new Error("Upload candidate changed before upload");
+    }
 
     let workspaceId = submission.browserJob?.workspaceId;
     if (!workspaceId) {

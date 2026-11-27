@@ -1,8 +1,28 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import {
+  action,
+  internalMutation,
+  internalQuery,
+  query,
+  type MutationCtx,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
+import {
+  activityFromSubmissions,
+  addSubmissionActivity,
+  applyActivityTransition,
+  type SubmissionActivityCounts,
+} from "../lib/submission-activity";
+import {
+  canApproveSubmission,
+  canCancelSubmission,
+  shouldRevertApprovalClaim,
+  shouldRevertCancelClaim,
+} from "../lib/submission-status";
 
 const statusValidator = v.union(
   v.literal("preparing"),
@@ -85,6 +105,64 @@ async function listOwnedSubmissions(ctx: QueryCtx, userId: Id<"users">) {
     .take(50);
 }
 
+async function readThreadActivityCounts(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  threadId: string,
+): Promise<SubmissionActivityCounts | null> {
+  const existing = await ctx.db
+    .query("submissionThreadActivity")
+    .withIndex("by_user_thread", (q) =>
+      q.eq("userId", userId).eq("threadId", threadId),
+    )
+    .unique();
+  if (!existing) return null;
+  return {
+    visibleCount: existing.visibleCount,
+    awaitingCount: existing.awaitingCount,
+    hasAwaitingReview: existing.hasAwaitingReview,
+  };
+}
+
+async function recomputeThreadActivity(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  threadId: string,
+): Promise<SubmissionActivityCounts> {
+  const submissions = await ctx.db
+    .query("submissions")
+    .withIndex("by_thread_user", (q) =>
+      q.eq("threadId", threadId).eq("userId", userId),
+    )
+    .collect();
+  return activityFromSubmissions(submissions);
+}
+
+async function upsertThreadActivity(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  threadId: string,
+  counts: SubmissionActivityCounts,
+) {
+  const existing = await ctx.db
+    .query("submissionThreadActivity")
+    .withIndex("by_user_thread", (q) =>
+      q.eq("userId", userId).eq("threadId", threadId),
+    )
+    .unique();
+  const now = Date.now();
+  if (existing) {
+    await ctx.db.patch(existing._id, { ...counts, updatedAt: now });
+    return;
+  }
+  await ctx.db.insert("submissionThreadActivity", {
+    userId,
+    threadId,
+    ...counts,
+    updatedAt: now,
+  });
+}
+
 export const createSubmissionDraft = internalMutation({
   args: {
     userId: v.id("users"),
@@ -114,6 +192,17 @@ export const createSubmissionDraft = internalMutation({
       detail: { goal: args.goal.trim() },
       at: now,
     });
+    if (args.threadId) {
+      const previousCounts = await readThreadActivityCounts(
+        ctx,
+        args.userId,
+        args.threadId,
+      );
+      const counts = previousCounts
+        ? addSubmissionActivity(previousCounts, "preparing")
+        : await recomputeThreadActivity(ctx, args.userId, args.threadId);
+      await upsertThreadActivity(ctx, args.userId, args.threadId, counts);
+    }
     return id;
   },
 });
@@ -180,6 +269,25 @@ export const updateSubmission = internalMutation({
         at: Date.now(),
       });
     }
+
+    const nextStatus =
+      typeof patch.status === "string" ? patch.status : submission.status;
+    const threadId = submission.threadId;
+    if (nextStatus !== submission.status && threadId) {
+      const previousCounts = await readThreadActivityCounts(
+        ctx,
+        submission.userId,
+        threadId,
+      );
+      const counts = previousCounts
+        ? applyActivityTransition(
+            previousCounts,
+            submission.status as string,
+            nextStatus as string,
+          )
+        : await recomputeThreadActivity(ctx, submission.userId, threadId);
+      await upsertThreadActivity(ctx, submission.userId, threadId, counts);
+    }
     return { applied: true as const };
   },
 });
@@ -227,6 +335,179 @@ export const listSubmissions = query({
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("Not authenticated");
     return await listOwnedSubmissions(ctx, userId);
+  },
+});
+
+export const listAwaitingReviewThreadIds = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("Not authenticated");
+    const activities = await ctx.db
+      .query("submissionThreadActivity")
+      .withIndex("by_user_awaiting", (q) =>
+        q.eq("userId", userId).eq("hasAwaitingReview", true),
+      )
+      .collect();
+    return [...new Set(activities.map((activity) => activity.threadId))];
+  },
+});
+
+export const getThreadActivity = query({
+  args: { threadId: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("Not authenticated");
+    const activity = await ctx.db
+      .query("submissionThreadActivity")
+      .withIndex("by_user_thread", (q) =>
+        q.eq("userId", userId).eq("threadId", args.threadId),
+      )
+      .unique();
+    return {
+      visibleCount: activity?.visibleCount ?? 0,
+      awaitingCount: activity?.awaitingCount ?? 0,
+      hasAwaitingReview: activity?.hasAwaitingReview ?? false,
+    };
+  },
+});
+
+export const listThreadSubmissions = query({
+  args: {
+    threadId: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("Not authenticated");
+    const page = await ctx.db
+      .query("submissions")
+      .withIndex("by_thread_user", (q) =>
+        q.eq("threadId", args.threadId).eq("userId", userId),
+      )
+      .order("desc")
+      .paginate(args.paginationOpts);
+    return {
+      ...page,
+      page: page.page.filter((submission) => submission.status !== "cancelled"),
+    };
+  },
+});
+
+export const approveForUpload = action({
+  args: { submissionId: v.id("submissions") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("Not authenticated");
+    const submission = await ctx.runQuery(internal.submissions.getSubmissionByUserId, {
+      submissionId: args.submissionId,
+      userId,
+    });
+    if (submission === null) throw new Error("Submission not found");
+    if (!canApproveSubmission(submission.status)) {
+      throw new Error(`Cannot approve: submission is ${submission.status}`);
+    }
+    const candidate = submission.files.uploadCandidate;
+    if (!candidate) throw new Error("Cannot approve: no upload candidate is set");
+
+    const applied = await ctx.runMutation(internal.submissions.updateSubmission, {
+      submissionId: args.submissionId,
+      expectStatus: "awaiting_review",
+      status: "submitting",
+      auditEvent: "approved_by_user",
+      auditDetail: { name: candidate.name, key: candidate.key },
+    });
+    if (!applied.applied) {
+      throw new Error("Submission changed while approving. Please retry.");
+    }
+
+    try {
+      await ctx.runAction(internal.browserUseJobs.startUploadJob, {
+        submissionId: args.submissionId,
+        expectedStatus: "submitting",
+        expectedCandidateKey: candidate.key,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Upload could not be started";
+      const current = await ctx.runQuery(internal.submissions.getSubmissionInternal, {
+        submissionId: args.submissionId,
+      });
+      if (
+        current &&
+        shouldRevertApprovalClaim(current.status, current.browserJob)
+      ) {
+        await ctx.runMutation(internal.submissions.updateSubmission, {
+          submissionId: args.submissionId,
+          expectStatus: "submitting",
+          status: "awaiting_review",
+          error: message,
+          auditEvent: "approval_upload_start_failed",
+          auditDetail: { message },
+        });
+      } else if (current?.status === "submitting") {
+        await ctx.runMutation(internal.submissions.updateSubmission, {
+          submissionId: args.submissionId,
+          expectStatus: "submitting",
+          error: message,
+          auditEvent: "approval_upload_start_failed",
+          auditDetail: { message, runId: current.browserJob?.runId ?? null },
+        });
+      }
+      throw new Error(`Approval recorded but upload could not be started: ${message}`);
+    }
+    return { ok: true as const };
+  },
+});
+
+export const cancelForUser = action({
+  args: { submissionId: v.id("submissions") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("Not authenticated");
+    const submission = await ctx.runQuery(internal.submissions.getSubmissionByUserId, {
+      submissionId: args.submissionId,
+      userId,
+    });
+    if (submission === null) throw new Error("Submission not found");
+    if (!canCancelSubmission(submission.status)) {
+      throw new Error(`Cannot cancel: submission is ${submission.status}`);
+    }
+
+    const previousStatus = submission.status;
+    const applied = await ctx.runMutation(internal.submissions.updateSubmission, {
+      submissionId: args.submissionId,
+      expectStatus: previousStatus,
+      status: "cancelled",
+      auditEvent: "cancelled_by_user",
+    });
+    if (!applied.applied) {
+      throw new Error("Submission changed while cancelling. Please retry.");
+    }
+
+    try {
+      await ctx.runAction(internal.browserUseJobs.cancelSubmissionJob, {
+        submissionId: args.submissionId,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Cancellation could not be completed";
+      const current = await ctx.runQuery(internal.submissions.getSubmissionInternal, {
+        submissionId: args.submissionId,
+      });
+      if (current && shouldRevertCancelClaim(current.status)) {
+        await ctx.runMutation(internal.submissions.updateSubmission, {
+          submissionId: args.submissionId,
+          expectStatus: "cancelled",
+          status: previousStatus,
+          error: message,
+          auditEvent: "cancel_failed",
+          auditDetail: { message },
+        });
+      }
+      throw new Error(`Cancellation failed: ${message}`);
+    }
+    return { ok: true as const };
   },
 });
 
