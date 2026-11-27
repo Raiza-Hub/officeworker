@@ -2,6 +2,7 @@
 
 import { StickToBottom } from "use-stick-to-bottom";
 import { useEditMessage } from "@/store/edit-message";
+import { ThreadSubmissionCard } from "@/components/agent/thread-submission-card";
 import type { OptimisticFirstMessage } from "@/components/agent/optimistic-first-message-types";
 import type { PreviewAttachment } from "@/lib/file-preview-types";
 import type {
@@ -19,6 +20,7 @@ import {
 import { ThreadLoading } from "./thread-loading";
 
 export function AgentThread({
+  threadId,
   optimisticFirstMessage,
   cachedThread,
   messages,
@@ -48,6 +50,11 @@ export function AgentThread({
   useOptimisticResolution(optimisticFirstMessage, realResults, onOptimisticResolved);
 
   const lastMessage = visibleResults[visibleResults.length - 1];
+  const isLoadingConversation =
+    messages.status === "LoadingFirstPage" &&
+    cachedThread.isLoading &&
+    visibleResults.length === 0 &&
+    !optimisticFirstMessage;
 
   useThreadLoadMore(messages);
 
@@ -55,7 +62,7 @@ export function AgentThread({
     <div className="flex min-h-0 flex-1 flex-col">
       <StickToBottom className="min-h-0 flex-1" resize="smooth" initial="instant">
         <StickToBottom.Content
-          scrollClassName="overflow-y-auto px-6 py-6"
+          scrollClassName="overflow-y-auto px-6 pt-6 pb-14"
           className="mx-auto flex min-h-full w-full max-w-178 flex-col gap-6"
         >
           {visibleResults.map((message) => (
@@ -73,10 +80,11 @@ export function AgentThread({
               connectionRetries={connectionRetries}
             />
           ))}
-          {messages.status === "LoadingFirstPage" &&
-            cachedThread.isLoading &&
-            visibleResults.length === 0 &&
-            !optimisticFirstMessage && <ThreadLoading />}
+          {isLoadingConversation ? (
+            <ThreadLoading />
+          ) : (
+            <ThreadSubmissionCard threadId={threadId} />
+          )}
         </StickToBottom.Content>
       </StickToBottom>
     </div>

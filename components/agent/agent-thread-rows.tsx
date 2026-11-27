@@ -7,7 +7,6 @@ import type {
 import { MessageActions } from "@/components/agent/message-actions";
 import { partText, type UIMessagePartList } from "@/components/agent/parts";
 import { Reasoning } from "@/components/agent/reasoning";
-import { SubmissionCard } from "@/components/agent/submission-card";
 import type { CachedThreadMessage } from "@/hooks/use-cached-thread-messages";
 import {
   AssistantMessage,
@@ -16,7 +15,6 @@ import {
 import type { PreviewAttachment } from "@/lib/file-preview-types";
 import {
   assistantPlainText,
-  extractSubmissionIds,
   finalAssistantParts,
 } from "@/components/agent/thread-helpers";
 import type { ThreadTiming } from "@/hooks/use-agent-thread-state";
@@ -29,7 +27,6 @@ export function AssistantThreadMessage({
   parts: UIMessagePartList;
 }) {
   const copyText = assistantPlainText(finalAssistantParts(parts));
-  const submissionIds = extractSubmissionIds(parts);
   return (
     <div key={message.id} className="flex w-full flex-col gap-2.5 items-start">
       <div className="group/message flex w-full flex-col gap-2.5 items-start">
@@ -44,11 +41,6 @@ export function AssistantThreadMessage({
           <MessageActions text={copyText} />
         )}
       </div>
-      {submissionIds.map((id) => (
-        <div key={id} className="w-full">
-          <SubmissionCard submissionId={id} />
-        </div>
-      ))}
     </div>
   );
 }
@@ -135,11 +127,6 @@ export function UserThreadMessage({
                 <MessageActions text={copyText} />
               )}
             </div>
-            {extractSubmissionIds(assistantParts).map((id) => (
-              <div key={id} className="w-full">
-                <SubmissionCard submissionId={id} />
-              </div>
-            ))}
           </div>
         )}
       </div>

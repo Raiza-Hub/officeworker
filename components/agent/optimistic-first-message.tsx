@@ -19,7 +19,7 @@ export function OptimisticFirstMessageView({
     <div className="flex min-h-0 flex-1 flex-col">
       <StickToBottom className="min-h-0 flex-1" resize="smooth" initial="instant">
         <StickToBottom.Content
-          scrollClassName="overflow-y-auto px-6 py-6"
+          scrollClassName="overflow-y-auto px-6 pt-6 pb-14"
           className="mx-auto flex min-h-full w-full max-w-178 flex-col gap-6"
         >
           <div className="flex w-full flex-col gap-4 items-end">

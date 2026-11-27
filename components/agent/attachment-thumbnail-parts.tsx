@@ -36,6 +36,7 @@ export function AttachmentPreviewContent({
   progress,
   footer,
   nameLines,
+  showName = true,
 }: {
   attachment: AttachmentThumbnailData;
   fileUrl: string | null;
@@ -44,6 +45,7 @@ export function AttachmentPreviewContent({
   progress: Progress;
   footer?: React.ReactNode;
   nameLines: 1 | 2;
+  showName?: boolean;
 }) {
   const progressBar =
     progress === null ? null : progress === "indeterminate" ? (
@@ -71,12 +73,14 @@ export function AttachmentPreviewContent({
         isUploading={isUploading || progress !== null}
         sourceError={sourceError}
       />
-      <span
-        title={attachment.name}
-        className={`mt-1 block w-full text-left [color:var(--attachment-name-color,#45474e)] [font-size:var(--attachment-name-size,11px)] [font-weight:var(--attachment-name-weight,400)] [line-height:var(--attachment-name-leading,16px)] ${nameLines === 2 ? "line-clamp-2 break-words" : "truncate"}`}
-      >
-        {attachment.name}
-      </span>
+      {showName ? (
+        <span
+          title={attachment.name}
+          className={`mt-1 block w-full text-left [color:var(--attachment-name-color,#45474e)] [font-size:var(--attachment-name-size,11px)] [font-weight:var(--attachment-name-weight,400)] [line-height:var(--attachment-name-leading,16px)] ${nameLines === 2 ? "line-clamp-2 break-words" : "truncate"}`}
+        >
+          {attachment.name}
+        </span>
+      ) : null}
       {progressBar}
       {footer ? <div className="mt-1.5">{footer}</div> : null}
     </>
@@ -92,6 +96,7 @@ export function AttachmentPreviewWrapper({
   progress,
   footer,
   nameLines,
+  showName = true,
 }: {
   attachment: AttachmentThumbnailData;
   onPreview?: () => void;
@@ -101,6 +106,7 @@ export function AttachmentPreviewWrapper({
   progress: Progress;
   footer?: React.ReactNode;
   nameLines: 1 | 2;
+  showName?: boolean;
 }) {
   const previewSupported = isPreviewSupported(attachment.name, attachment.mediaType);
   const canPreview = Boolean(onPreview) && previewSupported;
@@ -114,6 +120,7 @@ export function AttachmentPreviewWrapper({
       progress={progress}
       footer={footer}
       nameLines={nameLines}
+      showName={showName}
     />
   );
 
