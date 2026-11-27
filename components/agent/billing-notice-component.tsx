@@ -35,6 +35,9 @@ export function BillingNotice({
         />
         <span className="truncate text-[12.5px] leading-4 text-text-dim">
           {notice.message}
+          {notice.highlight ? (
+            <span className="font-medium text-primary">{notice.highlight}</span>
+          ) : null}
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-2.5">

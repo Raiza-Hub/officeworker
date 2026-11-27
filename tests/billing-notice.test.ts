@@ -113,6 +113,22 @@ describe("BillingNotice", () => {
     expect(html.includes("Editing message")).toBe(true);
   });
 
+  test("edit banner highlights the edited filename", () => {
+    const html = renderToStaticMarkup(
+      BillingNotice({
+        notice: {
+          code: "EDITING",
+          message: "Editing ",
+          highlight: "@report.xlsx",
+        },
+      }),
+    );
+    expect(html.includes("Editing ")).toBe(true);
+    expect(
+      html.includes('<span class="font-medium text-primary">@report.xlsx</span>'),
+    ).toBe(true);
+  });
+
   test("edit banner uses pencil icon instead of alert icon", () => {
     const tree = BillingNotice({
       notice: { code: "EDITING", message: "Editing message" },

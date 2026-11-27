@@ -7,6 +7,7 @@ import {
   useState,
   type ChangeEvent,
   type Dispatch,
+  type RefObject,
   type SetStateAction,
 } from "react";
 import { toast } from "sonner";
@@ -52,6 +53,7 @@ type AgentComposerProps = {
   loading?: boolean;
   attachments?: ChatAttachment[];
   onAttachmentsChange?: Dispatch<SetStateAction<ChatAttachment[]>>;
+  textareaRef?: RefObject<HTMLTextAreaElement | null>;
 };
 
 function collectAcceptedFiles(files: File[], knownFingerprints: Set<string>) {
@@ -194,9 +196,11 @@ export function AgentComposer({
   loading = false,
   attachments = [],
   onAttachmentsChange,
+  textareaRef: textareaRefProp,
 }: AgentComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fallbackTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = textareaRefProp ?? fallbackTextareaRef;
   const [pendingAttachments, setPendingAttachments] = useState<
     PendingAttachment[]
   >([]);
@@ -216,7 +220,7 @@ export function AgentComposer({
     textarea.style.height = `${height}px`;
     textarea.style.overflowY =
       textarea.scrollHeight > MAX_COMPOSER_HEIGHT ? "auto" : "hidden";
-  }, [value]);
+  }, [textareaRef, value]);
 
   function selectFiles() {
     fileInputRef.current?.click();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { AgentChatConversation } from "@/components/agent/agent-chat-conversation";
 import { AgentChatEmptyState } from "@/components/agent/agent-chat-empty-state";
 import { AgentChatHeader } from "@/components/agent/agent-chat-header";
@@ -33,6 +33,17 @@ import {
 
 export function AgentChat({ threadId: threadIdProp }: { threadId?: string }) {
   const core = useAgentChatCore(threadIdProp);
+  const [highlightPrefix, setHighlightPrefix] = useState<string | null>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const focusComposer = useCallback(() => {
+    requestAnimationFrame(() => {
+      const textarea = composerTextareaRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      const end = textarea.value.length;
+      textarea.setSelectionRange(end, end);
+    });
+  }, []);
   useAgentChatDraftSync({
     isNewChat: core.isNewChat,
     ensureDraft: core.ensureDraft,
@@ -109,24 +120,35 @@ export function AgentChat({ threadId: threadIdProp }: { threadId?: string }) {
     startEdit,
     cancelEdit,
     setPrompt: core.setPrompt,
+    setHighlightPrefix,
+    focusComposer,
   });
 
   const noticeNode = (
     <AgentChatNotices
       editing={core.editing}
       notice={core.notice}
+      fileEditPrefix={highlightPrefix}
       onCancelEdit={cancelEdit}
       onDismissNotice={() => core.setNotice(null)}
+      onDismissFileEdit={() => setHighlightPrefix(null)}
     />
   );
   const composer = (
     <AgentComposer
+      textareaRef={composerTextareaRef}
       value={core.prompt}
       onChange={(value) => {
         core.setPrompt(value);
+        setHighlightPrefix((current) =>
+          current && value.startsWith(current) ? current : null,
+        );
         if (core.notice) core.setNotice(null);
       }}
-      onSubmit={handleSubmit}
+      onSubmit={() => {
+        setHighlightPrefix(null);
+        handleSubmit();
+      }}
       isSubmitting={core.isSubmitting}
       isGenerating={activeTurn !== null}
       isStopping={core.isStopping}
